@@ -24,7 +24,8 @@
 }
 
 /* ========================================
-   PROFESSIONAL LEGAL DOCUMENT FORMATTING
+   CLML XML ELEMENT STYLING
+   Proper formatting for legislation.gov.uk XML
    ======================================== */
 
 .legislation-provision {
@@ -34,10 +35,257 @@
   line-height: 1.9;
 }
 
-/* Section Numbers */
+/* P1, P2, P3, P4 - Provision hierarchy */
+.legislation-provision P1,
+.legislation-provision P2,
+.legislation-provision P3,
+.legislation-provision P4 {
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+.legislation-provision P1 {
+  margin-left: 0;
+}
+
+.legislation-provision P2 {
+  margin-left: 2.5rem;
+  border-left: 3px solid #93a8ac;
+  padding-left: 1rem;
+}
+
+.legislation-provision P3 {
+  margin-left: 5rem;
+  border-left: 2px solid #93a8ac;
+  padding-left: 1rem;
+}
+
+.legislation-provision P4 {
+  margin-left: 7rem;
+}
+
+/* Pnumber - Provision numbers */
+.legislation-provision Pnumber {
+  display: inline-block;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 18px;
+  min-width: 3rem;
+  margin-right: 0.75rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Text - Main content */
+.legislation-provision Text {
+  display: inline;
+  color: #1e293b;
+}
+
+/* Para - Paragraphs */
+.legislation-provision Para {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* P1para, P2para, P3para, P4para */
+.legislation-provision P1para,
+.legislation-provision P2para,
+.legislation-provision P3para,
+.legislation-provision P4para {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+/* P1group - Provision groups */
+.legislation-provision P1group {
+  display: block;
+  margin-bottom: 2rem;
+}
+
+/* Title elements */
+.legislation-provision Title {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 20px;
+  margin: 1.5rem 0 1rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Pblock */
+.legislation-provision Pblock {
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+/* BlockAmendment */
+.legislation-provision BlockAmendment {
+  display: block;
+  background: #e0f2fe;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-left: 4px solid #0ea5e9;
+  border-radius: 4px;
+}
+
+/* Lists */
+.legislation-provision ListItem {
+  display: block;
+  margin-left: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.legislation-provision OrderedListItem {
+  display: block;
+  margin-left: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Definition */
+.legislation-provision Definition {
+  font-weight: 600;
+  color: #0f172a;
+  border-bottom: 2px dotted #4c5760;
+}
+
+/* Reference - Cross-references */
+.legislation-provision Reference {
+  color: #4c5760;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.legislation-provision Reference:hover {
+  color: #cd7f32;
+}
+
+/* Emphasis, Strong */
+.legislation-provision Emphasis {
+  font-style: italic;
+}
+
+.legislation-provision Strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* SmallCaps */
+.legislation-provision SmallCaps {
+  font-variant: small-caps;
+}
+
+/* Superior/Inferior */
+.legislation-provision Superior {
+  vertical-align: super;
+  font-size: 0.75em;
+}
+
+.legislation-provision Inferior {
+  vertical-align: sub;
+  font-size: 0.75em;
+}
+
+/* Tables */
+.legislation-provision table,
+.legislation-provision Tabular {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2rem 0;
+  border: 2px solid #4c5760;
+  display: table;
+}
+
+.legislation-provision Thead,
+.legislation-provision thead {
+  display: table-header-group;
+}
+
+.legislation-provision Tbody,
+.legislation-provision tbody {
+  display: table-row-group;
+}
+
+.legislation-provision Tr,
+.legislation-provision tr {
+  display: table-row;
+}
+
+.legislation-provision Th,
+.legislation-provision th {
+  display: table-cell;
+  background: #4c5760;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 1rem;
+  text-align: left;
+  border: 1px solid #66635b;
+}
+
+.legislation-provision Td,
+.legislation-provision td {
+  display: table-cell;
+  padding: 0.875rem;
+  border: 1px solid #66635b;
+  color: #1e293b;
+}
+
+.legislation-provision tbody tr:nth-child(even),
+.legislation-provision Tbody Tr:nth-child(even) {
+  background: #f8f9fa;
+}
+
+/* Schedule */
+.legislation-provision Schedule {
+  display: block;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 3px solid #4c5760;
+}
+
+/* SignedSection */
+.legislation-provision SignedSection {
+  display: block;
+  margin-top: 3rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+/* Note */
+.legislation-provision Note {
+  display: block;
+  font-size: 0.9em;
+  color: #66635b;
+  font-style: italic;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: #f1f5f9;
+  border-left: 3px solid #93a8ac;
+}
+
+/* Quotation */
+.legislation-provision BlockQuotation {
+  display: block;
+  margin: 1.5rem 0;
+  padding-left: 2rem;
+  border-left: 4px solid #93a8ac;
+  font-style: italic;
+}
+
+.legislation-provision InlineQuotation {
+  font-style: italic;
+}
+
+/* Figure */
+.legislation-provision Figure {
+  display: block;
+  margin: 2rem 0;
+  text-align: center;
+}
+
+/* HTML class-based selectors (for backward compatibility) */
 .legislation-provision .LegP1No,
-.legislation-provision .LegSectionNo,
-.legislation-provision .LegArticleRef {
+.legislation-provision .LegSectionNo {
   font-weight: 700;
   color: #0f172a;
   font-size: 20px;
@@ -47,11 +295,9 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Headings - Sans-serif */
 .legislation-provision h1,
 .legislation-provision .LegP1GroupTitle,
-.legislation-provision .LegHeading,
-.legislation-provision .LegPartTitle {
+.legislation-provision .LegHeading {
   color: #0f172a;
   font-weight: 700;
   font-size: 24px;
@@ -78,70 +324,39 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Containers - Ensure visibility */
 .legislation-provision .LegP1Container,
 .legislation-provision .LegP1Group,
-.legislation-provision .LegP1,
-.legislation-provision .LegPart,
-.legislation-provision .LegChapter {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+.legislation-provision .LegP1 {
+  display: block;
   margin-bottom: 2rem;
 }
 
-/* Paragraphs */
-.legislation-provision .LegP1Para,
-.legislation-provision .LegText {
-  margin-bottom: 1rem;
-  color: #1e293b;
-}
-
-/* Level 2 Sub-provisions */
 .legislation-provision .LegP2Container,
 .legislation-provision .LegP2 {
   margin-left: 2.5rem;
-  margin-bottom: 1.25rem;
-  padding: 0.75rem 0;
   border-left: 3px solid #93a8ac;
   padding-left: 1rem;
+  margin-bottom: 1.25rem;
 }
 
-.legislation-provision .LegP2Para {
-  margin-bottom: 0.75rem;
-  color: #1e293b;
-}
-
-.legislation-provision .LegP2No {
-  font-weight: 600;
-  color: #0f172a;
-  font-size: 17px;
-}
-
-/* Level 3 Sub-sub-provisions */
 .legislation-provision .LegP3Container,
 .legislation-provision .LegP3 {
   margin-left: 5rem;
-  margin-bottom: 1rem;
-  padding: 0.5rem 0;
   border-left: 2px solid #93a8ac;
   padding-left: 1rem;
+  margin-bottom: 1rem;
 }
 
-/* Links */
 .legislation-provision a {
   color: #4c5760;
   text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .legislation-provision a:hover {
-  color: #cd7f32; /* Bronze */
-  text-decoration-thickness: 3px;
+  color: #cd7f32;
 }
 
-/* Lists */
 .legislation-provision ul,
 .legislation-provision ol {
   margin-left: 2.5rem;
@@ -150,34 +365,7 @@
 
 .legislation-provision li {
   margin-bottom: 0.75rem;
-  padding-left: 0.75rem;
   color: #1e293b;
-}
-
-/* Tables */
-.legislation-provision table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 2rem 0;
-  border: 2px solid #4c5760;
-}
-
-.legislation-provision th {
-  background: #4c5760;
-  color: #ffffff;
-  font-weight: 700;
-  padding: 1rem;
-  text-align: left;
-}
-
-.legislation-provision td {
-  padding: 0.875rem;
-  border: 1px solid #66635b;
-  color: #1e293b;
-}
-
-.legislation-provision tbody tr:nth-child(even) {
-  background: #f8f9fa;
 }
 
 /* Scrollbar */
@@ -198,7 +386,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #cd7f32; /* Bronze */
+  background: #cd7f32;
 }
 
 /* Selection */
