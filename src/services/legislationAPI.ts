@@ -3,7 +3,6 @@ import type { SearchResult } from '../types';
 const LEGISLATION_BASE = 'https://www.legislation.gov.uk';
 const USE_PROXY = true;
 
-// Legislation types available on legislation.gov.uk
 export const LEGISLATION_TYPES = {
   ukpga: 'UK Public General Acts',
   ukla: 'UK Local Acts',
@@ -95,8 +94,8 @@ export const legislationAPI = {
           url = `${LEGISLATION_BASE}${url}`;
         }
         
-        // Remove /contents from URL to get the main document
-        url = url.replace('/contents', '');
+        // Remove /contents and any date/version from the URL
+        url = url.replace('/contents', '').split('/enacted')[0].split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
         
         results.push({
           title,
@@ -118,112 +117,110 @@ export const legislationAPI = {
     try {
       console.log('Original URL:', url);
       
-      // Clean the URL - remove /contents, /data.htm, etc
-      let cleanUrl = url
+      // Clean URL to base legislation ID
+      let baseUrl = url
         .replace('/contents', '')
         .replace('/data.htm', '')
         .replace('/data.html', '');
       
-      console.log('Cleaned URL:', cleanUrl);
+      // Remove any date/version paths like /2026-01-19 or /enacted
+      baseUrl = baseUrl.split('/enacted')[0].split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
       
-      const proxyUrl = `/api/legislation?url=${encodeURIComponent(cleanUrl)}`;
-      console.log('Fetching via proxy:', proxyUrl);
+      console.log('Base URL:', baseUrl);
       
-      const response = await fetch(proxyUrl);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to fetch:', errorText);
-        throw new Error(`Failed to fetch document: ${response.status}`);
-      }
-
-      const html = await response.text();
-      console.log('Received HTML, length:', html.length);
-      
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      
-      // Try multiple selectors for content
-      const selectors = [
-        '#viewLegContents',  // Main content area
-        '.LegContent',       // Legislation content
-        '#content',          // Generic content
-        'article',           // HTML5 article
-        'main',              // HTML5 main
-        '.content'           // Generic content class
+      // Try multiple strategies to get content
+      const strategies = [
+        baseUrl,                           // Base URL (e.g., /ukpga/2006/46)
+        `${baseUrl}/contents`,             // Contents page
+        `${baseUrl}/section/1`,            // First section
+        `${baseUrl}/enacted`,              // Enacted version
+        `${baseUrl}/enacted/contents`,     // Enacted contents
       ];
       
-      let content = null;
-      for (const selector of selectors) {
-        content = doc.querySelector(selector);
+      for (const tryUrl of strategies) {
+        console.log('Trying:', tryUrl);
+        
+        const proxyUrl = `/api/legislation?url=${encodeURIComponent(tryUrl)}`;
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+          console.log('Failed:', response.status);
+          continue;
+        }
+
+        const html = await response.text();
+        console.log('Response length:', html.length);
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Check if this is a version selection page
+        const pageText = doc.body.textContent || '';
+        if (pageText.includes('Latest available (Revised)') && 
+            pageText.includes('Point in Time') && 
+            pageText.includes('Original (As enacted)') &&
+            html.length < 10000) {
+          console.log('Version selection page, trying next strategy');
+          continue;
+        }
+        
+        // Try multiple content selectors
+        const selectors = [
+          '#viewLegContents',
+          '#content',
+          '.LegContent',
+          'article',
+          'main'
+        ];
+        
+        let content = null;
+        for (const selector of selectors) {
+          content = doc.querySelector(selector);
+          if (content && content.textContent && content.textContent.length > 500) {
+            console.log('Found content with:', selector);
+            break;
+          }
+        }
+        
+        if (!content) {
+          console.log('No content found with selectors, trying body');
+          content = doc.body;
+        }
+        
         if (content) {
-          console.log('Found content with selector:', selector);
-          break;
+          // Remove unwanted elements
+          const unwanted = content.querySelectorAll(
+            'script, style, nav, header, footer, .navigation, .breadcrumb, ' +
+            '.toolTip, .LegNavigation, .printOptions, .moreResources, ' +
+            '.accessKey, #layout1, .LegNav'
+          );
+          unwanted.forEach(el => el.remove());
+          
+          const finalHtml = content.innerHTML;
+          
+          // Verify we got actual content
+          if (finalHtml.length > 500 && 
+              !finalHtml.includes('Latest available (Revised)') && 
+              !finalHtml.includes('Point in Time')) {
+            console.log('Success! Content length:', finalHtml.length);
+            return finalHtml;
+          }
         }
       }
       
-      if (!content) {
-        console.warn('No content found with known selectors, using body');
-        content = doc.body;
-      }
-      
-      if (content) {
-        // Remove unwanted elements
-        const unwanted = content.querySelectorAll(
-          'script, style, .navigation, .nav, .breadcrumb, .footer, nav, header, ' +
-          '#header, #footer, .toolTip, .LegNavigation, .LegNav, .accessKey, ' +
-          '.printOptions, .moreResources'
-        );
-        unwanted.forEach(el => el.remove());
-        
-        const finalHtml = content.innerHTML;
-        console.log('Extracted content, length:', finalHtml.length);
-        
-        // Check if we only got version selection links
-        if (finalHtml.includes('Latest available') && 
-            finalHtml.includes('Point in Time') && 
-            finalHtml.length < 3000) {
-          console.warn('Got version selection page, retrying with /enacted');
-          return this.getDocument(cleanUrl + '/enacted');
-        }
-        
-        // Check if content is too short (likely an error or redirect page)
-        if (finalHtml.length < 1000) {
-          console.warn('Content too short, might be a redirect page');
-          console.log('Content preview:', finalHtml.substring(0, 500));
-        }
-        
-        return finalHtml;
-      }
-      
-      console.warn('Using body as fallback');
-      return doc.body.innerHTML;
+      // All strategies failed
+      console.error('All strategies failed to get content');
+      return `
+        <div style="padding: 20px; background: #f0e68c; border: 2px solid #daa520; border-radius: 8px;">
+          <h2>Unable to Load Document</h2>
+          <p>The legislation content could not be retrieved from <a href="${url}" target="_blank">${url}</a></p>
+          <p>Please click the link above to view it directly on legislation.gov.uk</p>
+          <p style="font-size: 0.9em; color: #666;">This may be because the document requires selecting a specific version or has restricted access.</p>
+        </div>
+      `;
       
     } catch (error) {
       console.error('Error fetching legislation document:', error);
-      throw error;
-    }
-  },
-
-  async getDocumentXML(url: string): Promise<string> {
-    if (!USE_PROXY) {
-      return '<mock>XML content</mock>';
-    }
-
-    try {
-      const xmlUrl = url.endsWith('/') ? `${url}data.xml` : `${url}/data.xml`;
-      const proxyUrl = `/api/legislation?url=${encodeURIComponent(xmlUrl)}`;
-      
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch XML');
-      }
-
-      return await response.text();
-    } catch (error) {
-      console.error('Error fetching XML:', error);
       throw error;
     }
   },
@@ -280,7 +277,7 @@ export const legislationAPI = {
       {
         title: 'Equality Act 2010',
         url: `${LEGISLATION_BASE}/ukpga/2010/15`,
-        snippet: 'An Act to make provision to require Ministers of the Crown and others when making strategic decisions about the exercise of their functions to have regard to the desirability of reducing socio-economic inequalities...',
+        snippet: 'An Act to make provision to require Ministers of the Crown and others when making strategic decisions...',
         source: 'legislation' as const,
       },
     ].filter(result => 
