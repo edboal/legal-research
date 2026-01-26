@@ -192,13 +192,11 @@ export const legislationAPI = {
       ];
       
       let content = null;
-      let usedSelector = '';
       
       for (const selector of selectors) {
         const el = doc.querySelector(selector);
         if (el && el.textContent && el.textContent.length > 500) {
           content = el;
-          usedSelector = selector;
           console.log('✅ Found content with selector:', selector);
           break;
         }
@@ -207,7 +205,6 @@ export const legislationAPI = {
       if (!content) {
         console.log('❌ No content selector worked, using body');
         content = doc.body;
-        usedSelector = 'body';
       }
       
       // Remove unwanted elements
