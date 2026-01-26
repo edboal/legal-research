@@ -124,121 +124,128 @@ export const legislationAPI = {
         .replace('/data.html', '');
       
       // Remove date paths like /2026-01-06 or /enacted
-      // Match pattern: /YYYY-MM-DD or /YYYY/MM/DD
       baseUrl = baseUrl.replace(/\/\d{4}-\d{2}-\d{2}/g, '');
       baseUrl = baseUrl.replace(/\/enacted/g, '');
       
       console.log('🧹 Cleaned base URL:', baseUrl);
       
-      // ALWAYS try /enacted first - this bypasses version selection
-      const enactedUrl = `${baseUrl}/enacted`;
-      console.log('📜 Trying enacted version:', enactedUrl);
-      
-      const proxyUrl = `/api/legislation?url=${encodeURIComponent(enactedUrl)}`;
-      const response = await fetch(proxyUrl);
-      
-      console.log('📡 Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const html = await response.text();
-      console.log('📄 HTML received, length:', html.length);
-      
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      
-      // Check the body text
-      const bodyText = doc.body.textContent || '';
-      console.log('📝 Body text preview:', bodyText.substring(0, 200));
-      
-      // More aggressive version selection detection
-      const isVersionPage = 
-        bodyText.includes('Latest available') ||
-        bodyText.includes('Point in Time') ||
-        bodyText.includes('Original (As enacted)') ||
-        bodyText.includes('More Resources') && html.length < 20000;
-      
-      if (isVersionPage) {
-        console.log('⚠️ Still got version selection page!');
-        console.log('📋 Full body text:', bodyText);
-        
-        // Return error message
-        return `
-          <div style="padding: 30px; background: #fff3cd; border: 3px solid #ffc107; border-radius: 10px; margin: 20px;">
-            <h2 style="color: #856404; margin-top: 0;">⚠️ Version Selection Page Detected</h2>
-            <p style="color: #856404; font-size: 16px;">The legislation.gov.uk website returned a version selection page instead of the document content.</p>
-            <p style="color: #856404;"><strong>Tried URL:</strong> <code>${enactedUrl}</code></p>
-            <p style="margin: 20px 0;">
-              <a href="${enactedUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Open Directly on legislation.gov.uk →
-              </a>
-            </p>
-            <details style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 5px;">
-              <summary style="cursor: pointer; font-weight: bold; color: #666;">Debug Information</summary>
-              <pre style="font-size: 12px; overflow: auto; margin-top: 10px;">${bodyText.substring(0, 1000)}</pre>
-            </details>
-          </div>
-        `;
-      }
-      
-      // Try to find content
-      const selectors = [
-        '#viewLegContents',
-        '#content',
-        '.LegContent', 
-        '#legislation',
-        'article',
-        'main'
+      // Try multiple strategies in order
+      const strategies = [
+        { url: baseUrl, desc: 'base URL' },
+        { url: `${baseUrl}/enacted`, desc: 'enacted version' },
+        { url: `${baseUrl}/contents`, desc: 'contents page' },
       ];
       
-      let content = null;
-      
-      for (const selector of selectors) {
-        const el = doc.querySelector(selector);
-        if (el && el.textContent && el.textContent.length > 500) {
-          content = el;
-          console.log('✅ Found content with selector:', selector);
-          break;
+      for (const strategy of strategies) {
+        console.log(`📜 Strategy ${strategies.indexOf(strategy) + 1}: Trying ${strategy.desc}:`, strategy.url);
+        
+        const proxyUrl = `/api/legislation?url=${encodeURIComponent(strategy.url)}`;
+        const response = await fetch(proxyUrl);
+        
+        console.log('📡 Response status:', response.status);
+        
+        if (!response.ok) {
+          console.log(`❌ Failed with ${response.status}, trying next strategy`);
+          continue;
         }
+
+        const html = await response.text();
+        console.log('📄 HTML received, length:', html.length);
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Check if this is a version selection page
+        const bodyText = doc.body.textContent || '';
+        
+        // More specific detection - look for the actual version selection UI elements
+        const hasVersionUI = doc.querySelector('.LegVersions') || 
+                            doc.querySelector('[class*="version"]') ||
+                            (bodyText.includes('Latest available') && 
+                             bodyText.includes('Point in Time') && 
+                             bodyText.includes('Original') &&
+                             html.length < 30000);
+        
+        if (hasVersionUI) {
+          console.log('⚠️ Version selection page detected, trying next strategy');
+          continue;
+        }
+        
+        // Try to find actual legislation content
+        const selectors = [
+          '#viewLegContents',
+          '#content',
+          '.LegContent',
+          'article',
+          'main'
+        ];
+        
+        let content = null;
+        
+        for (const selector of selectors) {
+          const el = doc.querySelector(selector);
+          if (el && el.textContent && el.textContent.length > 1000) {
+            content = el;
+            console.log('✅ Found content with selector:', selector);
+            break;
+          }
+        }
+        
+        if (!content) {
+          console.log('⚠️ No content found with selectors, trying next strategy');
+          continue;
+        }
+        
+        // Remove unwanted elements
+        const unwanted = content.querySelectorAll(
+          'script, style, nav, header, footer, .navigation, .breadcrumb, ' +
+          '.toolTip, .LegNavigation, .printOptions, .moreResources, ' +
+          '.accessKey, #layout1, .LegNav, .LegBreadcrumb, .LegVersions'
+        );
+        
+        console.log('🗑️ Removing', unwanted.length, 'unwanted elements');
+        unwanted.forEach(el => el.remove());
+        
+        const finalHtml = content.innerHTML;
+        console.log('✨ Final content length:', finalHtml.length);
+        
+        // Validate we have real content (not just navigation)
+        if (finalHtml.length > 1000 && !finalHtml.includes('Skip to main content')) {
+          console.log('✅ SUCCESS! Returning content from strategy:', strategy.desc);
+          return finalHtml;
+        }
+        
+        console.log('⚠️ Content too short or invalid, trying next strategy');
       }
       
-      if (!content) {
-        console.log('❌ No content selector worked, using body');
-        content = doc.body;
-      }
-      
-      // Remove unwanted elements
-      const unwanted = content.querySelectorAll(
-        'script, style, nav, header, footer, .navigation, .breadcrumb, ' +
-        '.toolTip, .LegNavigation, .printOptions, .moreResources, ' +
-        '.accessKey, #layout1, .LegNav, .LegBreadcrumb'
-      );
-      
-      console.log('🗑️ Removing', unwanted.length, 'unwanted elements');
-      unwanted.forEach(el => el.remove());
-      
-      const finalHtml = content.innerHTML;
-      console.log('✨ Final content length:', finalHtml.length);
-      
-      // Validate we have real content
-      if (finalHtml.length < 500) {
-        throw new Error('Content too short');
-      }
-      
-      return finalHtml;
+      // All strategies failed
+      console.error('❌ All strategies failed');
+      return `
+        <div style="padding: 30px; background: #fff3cd; border: 3px solid #ffc107; border-radius: 10px; margin: 20px;">
+          <h2 style="color: #856404; margin-top: 0;">⚠️ Unable to Load Document</h2>
+          <p style="color: #856404; font-size: 16px;">All loading strategies failed to retrieve the document content.</p>
+          <p style="color: #856404;"><strong>Original URL:</strong> <code>${url}</code></p>
+          <p style="color: #856404;"><strong>Base URL:</strong> <code>${baseUrl}</code></p>
+          <p style="margin: 20px 0;">
+            <a href="${baseUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              Open on legislation.gov.uk →
+            </a>
+          </p>
+          <p style="font-size: 14px; color: #666;">
+            This legislation may require manual version selection or have restricted access.
+          </p>
+        </div>
+      `;
       
     } catch (error) {
       console.error('❌ Error fetching document:', error);
       return `
         <div style="padding: 30px; background: #f8d7da; border: 3px solid #dc3545; border-radius: 10px; margin: 20px;">
-          <h2 style="color: #721c24; margin-top: 0;">❌ Failed to Load Document</h2>
+          <h2 style="color: #721c24; margin-top: 0;">❌ Error Loading Document</h2>
           <p style="color: #721c24; font-size: 16px;">Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
-          <p style="color: #721c24;"><strong>Attempted URL:</strong> <code>${url}</code></p>
           <p style="margin: 20px 0;">
             <a href="${url}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
-              Open Directly on legislation.gov.uk →
+              Open on legislation.gov.uk →
             </a>
           </p>
         </div>
