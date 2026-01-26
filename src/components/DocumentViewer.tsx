@@ -180,25 +180,33 @@ export function DocumentViewer({
           const changesUrl = `${baseUrl}/changes/data.xml`;
           const changesResponse = await fetch(`/api/legislation?url=${encodeURIComponent(changesUrl)}`);
           
-if (changesResponse.ok) {
-  const xmlText = await changesResponse.text();
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-  const relationships = parseRelationships(xmlDoc, baseUrl);
-  setRelationshipsData(relationships);
-} else {
-  // Both endpoints failed - set empty but valid data to show helpful message
-  console.log('No effects or changes data available for this legislation');
-  setRelationshipsData({ 
-    nodes: [{ 
-      id: baseUrl, 
-      name: document?.title || 'Current Legislation', 
-      type: 'current', 
-      url: baseUrl 
-    }], 
-    links: [] 
-  });
-}
+          if (changesResponse.ok) {
+            const xmlText = await changesResponse.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            const relationships = parseRelationships(xmlDoc, baseUrl);
+            setRelationshipsData(relationships);
+          } else {
+            console.log('No effects or changes data available for this legislation');
+            setRelationshipsData({ 
+              nodes: [{ 
+                id: baseUrl, 
+                name: document?.title || 'Current Legislation', 
+                type: 'current', 
+                url: baseUrl 
+              }], 
+              links: [] 
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching relationships:', error);
+        setRelationshipsData(null);
+      } finally {
+        setLoadingRelationships(false);
+      }
+    };
+    
     fetchRelationships();
   }, [document?.id]);
 
@@ -404,6 +412,20 @@ if (changesResponse.ok) {
     setTableOfContents(items);
   };
 
+  const handleInternalLink = (href: string) => {
+    const sectionMatch = href.match(/section-(\d+)|article-(\d+)|regulation-(\d+)/i);
+    if (sectionMatch) {
+      const sectionNum = sectionMatch[1] || sectionMatch[2] || sectionMatch[3];
+      const provision = flatProvisions.find(p => 
+        p.number === sectionNum || p.id.includes(sectionNum)
+      );
+      if (provision) {
+        const idx = flatProvisions.indexOf(provision);
+        fetchProvision(provision, idx);
+      }
+    }
+  };
+
   const fetchProvision = async (item: TOCItem, index?: number) => {
     setLoadingProvision(true);
     setSelectedProvision(item);
@@ -449,119 +471,58 @@ if (changesResponse.ok) {
     }
   };
 
- const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
-  const clone = body.cloneNode(true) as Element;
-  
-  // Step 1: Handle commentary refs and create accordions
-  const commentaryRefs = Array.from(clone.querySelectorAll('CommentaryRef'));
-  const accordionsToInsert: { provision: Element, html: string }[] = [];
-  
-  commentaryRefs.forEach((ref: Element) => {
-    const commentaryId = ref.getAttribute('Ref');
+  const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
+    const clone = body.cloneNode(true) as Element;
     
-    if (commentaryId) {
-      const commentary = xmlDoc.querySelector(`Commentary[id="${commentaryId}"]`);
-      if (commentary) {
-        const type = commentary.getAttribute('Type');
-        const text = commentary.textContent || '';
-        
-        let title = 'Note';
-        if (type === 'F' || type === 'M') {
-          title = 'Textual Amendment';
-        } else if (type === 'I' || type === 'C') {
-          title = 'Commencement Information';
-        }
-        
-        const parentProvision = ref.closest('P1, P2, P3, P4');
-        if (parentProvision) {
-          const accordionHtml = `
-            <div class="amendment-accordion">
-              <button class="accordion-button" onclick="this.classList.toggle('active'); const content = this.nextElementSibling; content.style.display = content.style.display === 'none' ? 'block' : 'none';">
-                <span style="display: flex; align-items: center; gap: 8px;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                  ${title}
-                </span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
-              <div class="accordion-content" style="display: none;">${text}</div>
-            </div>
-          `;
+    const commentaryRefs = Array.from(clone.querySelectorAll('CommentaryRef'));
+    const accordionsToInsert: { provision: Element, html: string }[] = [];
+    
+    commentaryRefs.forEach((ref: Element) => {
+      const commentaryId = ref.getAttribute('Ref');
+      
+      if (commentaryId) {
+        const commentary = xmlDoc.querySelector(`Commentary[id="${commentaryId}"]`);
+        if (commentary) {
+          const type = commentary.getAttribute('Type');
+          const text = commentary.textContent || '';
           
-          accordionsToInsert.push({ provision: parentProvision, html: accordionHtml });
+          let title = 'Note';
+          if (type === 'F' || type === 'M') {
+            title = 'Textual Amendment';
+          } else if (type === 'I' || type === 'C') {
+            title = 'Commencement Information';
+          }
+          
+          const parentProvision = ref.closest('P1, P2, P3, P4');
+          if (parentProvision) {
+            const accordionHtml = `
+              <div class="amendment-accordion">
+                <button class="accordion-button" onclick="this.classList.toggle('active'); const content = this.nextElementSibling; content.style.display = content.style.display === 'none' ? 'block' : 'none';">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    ${title}
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-content" style="display: none;">${text}</div>
+              </div>
+            `;
+            
+            accordionsToInsert.push({ provision: parentProvision, html: accordionHtml });
+          }
         }
       }
-    }
-    
-    ref.remove();
-  });
-  
-  accordionsToInsert.forEach(({ provision, html }) => {
-    const div = window.document.createElement('div');
-    div.innerHTML = html;
-    provision.parentNode?.insertBefore(div.firstElementChild!, provision.nextSibling);
-  });
-  
-  // Step 2: Remove ALL XML attributes
-  const allElements = clone.querySelectorAll('*');
-  allElements.forEach(el => {
-    const attributes = Array.from(el.attributes);
-    attributes.forEach(attr => {
-      if (!['class', 'style', 'href', 'onclick', 'data-ref'].includes(attr.name)) {
-        el.removeAttribute(attr.name);
-      }
+      
+      ref.remove();
     });
-  });
-  
-  // Step 3: Convert Reference/Citation elements to clickable links
-  const references = clone.querySelectorAll('Reference, InternalLink, Citation');
-  references.forEach((ref: Element) => {
-    const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
-    const text = ref.textContent || '';
-    
-    if (href) {
-      const anchor = window.document.createElement('a');
-      anchor.textContent = text;
-      anchor.href = '#';
-      anchor.className = 'internal-link';
-      anchor.setAttribute('data-ref', href);
-      anchor.onclick = (e) => {
-        e.preventDefault();
-        handleInternalLink(href);
-      };
-      ref.parentNode?.replaceChild(anchor, ref);
-    } else {
-      // No href - just replace with text node
-      const textNode = window.document.createTextNode(text);
-      ref.parentNode?.replaceChild(textNode, ref);
-    }
-  });
-  
-  // Step 4: Convert XML tags to plain text (remove tags but keep content)
-  const tagsToFlatten = [
-    'Substitution', 'Addition', 'Repeal', 'Abbreviation', 
-    'Emphasis', 'Strong', 'SmallCaps', 'Text', 'Para'
-  ];
-  
-  tagsToFlatten.forEach(tagName => {
-    const elements = clone.querySelectorAll(tagName);
-    elements.forEach(el => {
-      const text = el.textContent || '';
-      const textNode = window.document.createTextNode(text);
-      el.parentNode?.replaceChild(textNode, el);
-    });
-  });
-  
-  const serializer = new XMLSerializer();
-  return serializer.serializeToString(clone);
-};
     
     accordionsToInsert.forEach(({ provision, html }) => {
       const div = window.document.createElement('div');
@@ -569,23 +530,24 @@ if (changesResponse.ok) {
       provision.parentNode?.insertBefore(div.firstElementChild!, provision.nextSibling);
     });
     
-    const elementsWithAttrs = clone.querySelectorAll('*');
-    elementsWithAttrs.forEach(el => {
-      el.removeAttribute('ChangeId');
-      el.removeAttribute('CommentaryRef');
-      el.removeAttribute('AltVersionRefs');
-      el.removeAttribute('Status');
-      el.removeAttribute('Match');
-      el.removeAttribute('RestrictStartDate');
-      el.removeAttribute('RestrictEndDate');
+    const allElements = clone.querySelectorAll('*');
+    allElements.forEach(el => {
+      const attributes = Array.from(el.attributes);
+      attributes.forEach(attr => {
+        if (!['class', 'style', 'href', 'onclick', 'data-ref'].includes(attr.name)) {
+          el.removeAttribute(attr.name);
+        }
+      });
     });
     
     const references = clone.querySelectorAll('Reference, InternalLink, Citation');
     references.forEach((ref: Element) => {
       const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
+      const text = ref.textContent || '';
+      
       if (href) {
         const anchor = window.document.createElement('a');
-        anchor.textContent = ref.textContent || '';
+        anchor.textContent = text;
         anchor.href = '#';
         anchor.className = 'internal-link';
         anchor.setAttribute('data-ref', href);
@@ -594,25 +556,28 @@ if (changesResponse.ok) {
           handleInternalLink(href);
         };
         ref.parentNode?.replaceChild(anchor, ref);
+      } else {
+        const textNode = window.document.createTextNode(text);
+        ref.parentNode?.replaceChild(textNode, ref);
       }
+    });
+    
+    const tagsToFlatten = [
+      'Substitution', 'Addition', 'Repeal', 'Abbreviation', 
+      'Emphasis', 'Strong', 'SmallCaps', 'Text', 'Para'
+    ];
+    
+    tagsToFlatten.forEach(tagName => {
+      const elements = clone.querySelectorAll(tagName);
+      elements.forEach(el => {
+        const text = el.textContent || '';
+        const textNode = window.document.createTextNode(text);
+        el.parentNode?.replaceChild(textNode, el);
+      });
     });
     
     const serializer = new XMLSerializer();
     return serializer.serializeToString(clone);
-  };
-
-  const handleInternalLink = (href: string) => {
-    const sectionMatch = href.match(/section-(\d+)|article-(\d+)|regulation-(\d+)/i);
-    if (sectionMatch) {
-      const sectionNum = sectionMatch[1] || sectionMatch[2] || sectionMatch[3];
-      const provision = flatProvisions.find(p => 
-        p.number === sectionNum || p.id.includes(sectionNum)
-      );
-      if (provision) {
-        const idx = flatProvisions.indexOf(provision);
-        fetchProvision(provision, idx);
-      }
-    }
   };
 
   const navigateProvision = (direction: 'prev' | 'next') => {
