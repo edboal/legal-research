@@ -39,7 +39,7 @@ const HIGHLIGHT_COLORS = [
   { name: 'Pink', color: '#fbcfe8', border: '#f9a8d4' },
 ];
 
-type RightPanelTab = 'notes' | null;
+type RightPanelTab = 'notes' | 'relationships' | null;
 
 export function DocumentViewer({
   document,
@@ -69,6 +69,8 @@ export function DocumentViewer({
   const [selectedHighlightColor, setSelectedHighlightColor] = useState(0);
   const [documentStatus, setDocumentStatus] = useState<StatusInfo | null>(null);
   const [outstandingChangesUrl, setOutstandingChangesUrl] = useState<string>('');
+  const [relationshipsData, setRelationshipsData] = useState<any>(null);
+  const [loadingRelationships, setLoadingRelationships] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,9 +116,6 @@ export function DocumentViewer({
     const fetchTOC = async () => {
       setLoadingTOC(true);
       try {
-        // Extract base URL from document URL
-        // Example: https://www.legislation.gov.uk/ukpga/2018/12/2020-12-31/data.htm
-        // Should become: https://www.legislation.gov.uk/ukpga/2018/12
         const urlParts = document.url.match(/^(https:\/\/www\.legislation\.gov\.uk\/[^\/]+\/[^\/]+\/[^\/]+)/);
         const baseUrl = urlParts ? urlParts[1] : document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '');
         
@@ -133,7 +132,6 @@ export function DocumentViewer({
         const status = extractStatusFromMetadata(metadata);
         setDocumentStatus(status);
         
-        // Set outstanding changes URL - same base URL + /changes/affected
         setOutstandingChangesUrl(`${baseUrl}/changes/affected`);
         
         const toc = parseTOCFromXML(xmlDoc);
@@ -150,6 +148,93 @@ export function DocumentViewer({
 
     fetchTOC();
   }, [document?.id]);
+
+  useEffect(() => {
+    if (!document) return;
+    
+    const fetchRelationships = async () => {
+      setLoadingRelationships(true);
+      try {
+        const urlParts = document.url.match(/^(https:\/\/www\.legislation\.gov\.uk\/[^\/]+\/[^\/]+\/[^\/]+)/);
+        const baseUrl = urlParts ? urlParts[1] : document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '');
+        
+        const effectsUrl = `${baseUrl}/effects/data.xml`;
+        const response = await fetch(`/api/legislation?url=${encodeURIComponent(effectsUrl)}`);
+        
+        if (response.ok) {
+          const xmlText = await response.text();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+          
+          const relationships = parseRelationships(xmlDoc, baseUrl);
+          setRelationshipsData(relationships);
+        }
+      } catch (error) {
+        console.error('Error fetching relationships:', error);
+        setRelationshipsData(null);
+      } finally {
+        setLoadingRelationships(false);
+      }
+    };
+    
+    fetchRelationships();
+  }, [document?.id]);
+
+  const parseRelationships = (xmlDoc: XMLDocument, currentUrl: string) => {
+    const nodes: any[] = [];
+    const links: any[] = [];
+    
+    const currentTitle = document?.title || 'Current Legislation';
+    nodes.push({
+      id: currentUrl,
+      name: currentTitle,
+      type: 'current',
+      url: currentUrl
+    });
+    
+    const effects = xmlDoc.querySelectorAll('Effect');
+    effects.forEach((effect: Element) => {
+      const affectedURI = effect.querySelector('AffectedProvisions')?.getAttribute('URI');
+      const affectedTitle = effect.querySelector('AffectedTitle')?.textContent || 'Unknown Legislation';
+      const affectingURI = effect.querySelector('AffectingProvisions')?.getAttribute('URI');
+      const affectingTitle = effect.querySelector('AffectingTitle')?.textContent || 'Unknown Legislation';
+      const effectType = effect.getAttribute('Type') || 'affects';
+      
+      if (affectedURI && affectedURI !== currentUrl) {
+        if (!nodes.find(n => n.id === affectedURI)) {
+          nodes.push({
+            id: affectedURI,
+            name: affectedTitle,
+            type: 'affected',
+            url: affectedURI
+          });
+        }
+        links.push({
+          source: currentUrl,
+          target: affectedURI,
+          type: effectType
+        });
+      }
+      
+      if (affectingURI && affectingURI !== currentUrl) {
+        if (!nodes.find(n => n.id === affectingURI)) {
+          nodes.push({
+            id: affectingURI,
+            name: affectingTitle,
+            type: 'affecting',
+            url: affectingURI
+          });
+        }
+        links.push({
+          source: affectingURI,
+          target: currentUrl,
+          type: effectType
+        });
+      }
+    });
+    
+    return { nodes, links };
+  };
 
   const extractStatusFromMetadata = (metadata: Element | null): StatusInfo => {
     if (!metadata) {
@@ -345,7 +430,6 @@ export function DocumentViewer({
   const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
     const clone = body.cloneNode(true) as Element;
     
-    // First, handle commentary refs and insert accordions
     const commentaryRefs = Array.from(clone.querySelectorAll('CommentaryRef'));
     const accordionsToInsert: { provision: Element, html: string }[] = [];
     
@@ -365,7 +449,6 @@ export function DocumentViewer({
             title = 'Commencement Information';
           }
           
-          // Find the parent provision
           const parentProvision = ref.closest('P1, P2, P3, P4');
           if (parentProvision) {
             const accordionHtml = `
@@ -394,30 +477,26 @@ export function DocumentViewer({
         }
       }
       
-      // Remove the commentary ref
       ref.remove();
     });
     
-    // Insert accordions after provisions
     accordionsToInsert.forEach(({ provision, html }) => {
       const div = window.document.createElement('div');
       div.innerHTML = html;
       provision.parentNode?.insertBefore(div.firstElementChild!, provision.nextSibling);
     });
     
-    // Remove ALL XML attributes
-const elementsWithAttrs = clone.querySelectorAll('*');
-elementsWithAttrs.forEach(el => {
-  el.removeAttribute('ChangeId');
-  el.removeAttribute('CommentaryRef');
-  el.removeAttribute('AltVersionRefs');
-  el.removeAttribute('Status');
-  el.removeAttribute('Match');
-  el.removeAttribute('RestrictStartDate');
-  el.removeAttribute('RestrictEndDate');
-});
+    const elementsWithAttrs = clone.querySelectorAll('*');
+    elementsWithAttrs.forEach(el => {
+      el.removeAttribute('ChangeId');
+      el.removeAttribute('CommentaryRef');
+      el.removeAttribute('AltVersionRefs');
+      el.removeAttribute('Status');
+      el.removeAttribute('Match');
+      el.removeAttribute('RestrictStartDate');
+      el.removeAttribute('RestrictEndDate');
+    });
     
-    // Process internal references
     const references = clone.querySelectorAll('Reference, InternalLink, Citation');
     references.forEach((ref: Element) => {
       const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
@@ -636,7 +715,6 @@ elementsWithAttrs.forEach(el => {
         <ArrowUp size={24} />
       </button>
 
-      {/* Copyright Modal */}
       {showCopyright && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-white rounded-lg shadow-2xl max-w-2xl mx-4 p-6">
@@ -667,7 +745,6 @@ elementsWithAttrs.forEach(el => {
         </div>
       )}
 
-      {/* Header */}
       <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -712,7 +789,6 @@ elementsWithAttrs.forEach(el => {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-1.5 flex-shrink-0">
             <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`} title="Toggle favorite">
               <Star size={18} fill={document.isFavorite ? 'currentColor' : 'none'} />
@@ -771,7 +847,6 @@ elementsWithAttrs.forEach(el => {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* TOC Panel */}
         {!tocCollapsed && (
           <div 
             className="border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden relative"
@@ -836,7 +911,6 @@ elementsWithAttrs.forEach(el => {
           </div>
         )}
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedProvision && (
             <div className="bg-sand-dune border-b-2 border-dim-grey px-6 py-3 flex items-center justify-between flex-shrink-0">
@@ -916,7 +990,127 @@ elementsWithAttrs.forEach(el => {
           </div>
         </div>
 
-        {/* Right Panel - Notes Only */}
+        {rightPanelTab === 'relationships' && (
+          <div className="w-[600px] border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
+            <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
+              <div className="flex items-center justify-between p-4">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <circle cx="12" cy="5" r="2"/>
+                    <circle cx="5" cy="12" r="2"/>
+                    <circle cx="19" cy="12" r="2"/>
+                    <circle cx="12" cy="19" r="2"/>
+                    <line x1="12" y1="7" x2="12" y2="9"/>
+                    <line x1="7" y1="12" x2="9" y2="12"/>
+                    <line x1="15" y1="12" x2="17" y2="12"/>
+                    <line x1="12" y1="15" x2="12" y2="17"/>
+                  </svg>
+                  Legislation Relationships
+                </h3>
+                <button
+                  onClick={() => setRightPanelTab(null)}
+                  className="text-white hover:text-bronze transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 bg-sand-dune">
+              {loadingRelationships ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <Loader className="w-12 h-12 text-bronze animate-spin mb-4" />
+                  <p className="text-sm text-iron-grey">Loading relationships...</p>
+                </div>
+              ) : relationshipsData && relationshipsData.nodes.length > 1 ? (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-lg p-4 border border-bronze/30">
+                    <h4 className="font-bold text-iron-grey mb-3 flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="16 18 22 12 16 6"/>
+                        <polyline points="8 6 2 12 8 18"/>
+                      </svg>
+                      This Legislation Affects
+                    </h4>
+                    {relationshipsData.links
+                      .filter((link: any) => link.source === relationshipsData.nodes[0].id)
+                      .map((link: any, idx: number) => {
+                        const targetNode = relationshipsData.nodes.find((n: any) => n.id === link.target);
+                        return (
+                          <div key={idx} className="mb-3 p-3 bg-sand-dune rounded border border-dim-grey/20">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold uppercase">
+                                {link.type}
+                              </span>
+                              <a 
+                                href={targetNode?.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-iron-grey hover:text-bronze flex items-center gap-1"
+                              >
+                                {targetNode?.name}
+                                <ExternalLink size={12} />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {relationshipsData.links.filter((link: any) => link.source === relationshipsData.nodes[0].id).length === 0 && (
+                      <p className="text-sm text-dim-grey italic">No outgoing relationships found</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-bronze/30">
+                    <h4 className="font-bold text-iron-grey mb-3 flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6"/>
+                        <polyline points="15 18 21 12 15 6"/>
+                      </svg>
+                      This Legislation Is Affected By
+                    </h4>
+                    {relationshipsData.links
+                      .filter((link: any) => link.target === relationshipsData.nodes[0].id)
+                      .map((link: any, idx: number) => {
+                        const sourceNode = relationshipsData.nodes.find((n: any) => n.id === link.source);
+                        return (
+                          <div key={idx} className="mb-3 p-3 bg-sand-dune rounded border border-dim-grey/20">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded font-semibold uppercase">
+                                {link.type}
+                              </span>
+                              <a 
+                                href={sourceNode?.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-iron-grey hover:text-bronze flex items-center gap-1"
+                              >
+                                {sourceNode?.name}
+                                <ExternalLink size={12} />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {relationshipsData.links.filter((link: any) => link.target === relationshipsData.nodes[0].id).length === 0 && (
+                      <p className="text-sm text-dim-grey italic">No incoming relationships found</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-dim-grey py-12">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto mb-4 opacity-30">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <p className="text-sm">No relationship data available for this legislation</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {rightPanelTab === 'notes' && (
           <div className="w-80 border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
             <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
@@ -981,9 +1175,26 @@ elementsWithAttrs.forEach(el => {
           </div>
         )}
 
-        {/* Notes Button (when panel closed) */}
         {rightPanelTab === null && (
-          <div className="border-l-2 border-dim-grey bg-white p-2">
+          <div className="border-l-2 border-dim-grey bg-white p-2 flex flex-col gap-2">
+            <button
+              onClick={() => setRightPanelTab('relationships')}
+              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
+              title="Legislation Relationships"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-iron-grey">
+                <circle cx="12" cy="12" r="3"/>
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="5" cy="12" r="2"/>
+                <circle cx="19" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
+                <line x1="12" y1="7" x2="12" y2="9"/>
+                <line x1="7" y1="12" x2="9" y2="12"/>
+                <line x1="15" y1="12" x2="17" y2="12"/>
+                <line x1="12" y1="15" x2="12" y2="17"/>
+              </svg>
+            </button>
+            
             <button
               onClick={() => setRightPanelTab('notes')}
               className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
