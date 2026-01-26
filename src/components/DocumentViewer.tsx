@@ -46,52 +46,71 @@ export function DocumentViewer({
     
     // Find all major provisions (sections, articles, regulations, etc.)
     const provisionElements = doc.querySelectorAll(
-      '.LegP1Container, .LegP1, section, article, .provision'
+      '.LegP1Container, .LegP1Group, section, article'
     );
     
-    provisionElements.forEach((element, index) => {
-      // Get section number
-      const numberEl = element.querySelector('.LegP1No, .LegSectionNo, .number');
-      const number = numberEl?.textContent?.trim() || `${index + 1}`;
-      
-      // Get title/heading
-      const titleEl = element.querySelector('.LegP1GroupTitle, .LegHeading, h1, h2, h3, h4');
-      const title = titleEl?.textContent?.trim() || `Provision ${number}`;
-      
-      // Get full content
-      const content = element.innerHTML;
-      
-      if (content && content.length > 50) {
-        provisionsList.push({
-          id: `provision-${index}`,
-          title,
-          number,
-          content
-        });
-      }
-    });
-    
-    // If no provisions found, split by major headings
-    if (provisionsList.length === 0) {
-      const headings = doc.querySelectorAll('h1, h2, .LegHeading');
-      headings.forEach((heading, index) => {
-        let content = '';
-        let nextElement = heading.nextElementSibling;
+    if (provisionElements.length > 0) {
+      provisionElements.forEach((element, index) => {
+        // Get section number
+        const numberEl = element.querySelector('.LegP1No, .LegSectionNo, .number');
+        const number = numberEl?.textContent?.trim() || `${index + 1}`;
         
-        while (nextElement && !nextElement.matches('h1, h2, .LegHeading')) {
-          content += nextElement.outerHTML;
-          nextElement = nextElement.nextElementSibling;
-        }
+        // Get title/heading
+        const titleEl = element.querySelector('.LegP1GroupTitle, .LegHeading, h1, h2, h3, h4');
+        const title = titleEl?.textContent?.trim() || `Provision ${number}`;
         
-        if (content.length > 50) {
+        // Get full content including all paragraphs and sub-provisions
+        const content = element.outerHTML;
+        
+        if (content && content.length > 100) {
           provisionsList.push({
-            id: `section-${index}`,
-            title: heading.textContent?.trim() || `Section ${index + 1}`,
-            number: `${index + 1}`,
-            content: heading.outerHTML + content
+            id: `provision-${index}`,
+            title,
+            number,
+            content
           });
         }
       });
+    }
+    
+    // Fallback: If no structured provisions found, split by headings
+    if (provisionsList.length === 0) {
+      const allContent = doc.body.innerHTML;
+      
+      // Try to split by h2 or h3 headings
+      const headings = doc.querySelectorAll('h1, h2, h3, .LegHeading');
+      
+      if (headings.length > 0) {
+        headings.forEach((heading, index) => {
+          const headingText = heading.textContent?.trim() || `Section ${index + 1}`;
+          
+          // Collect content until next heading
+          let contentHtml = heading.outerHTML;
+          let nextElement = heading.nextElementSibling;
+          
+          while (nextElement && !nextElement.matches('h1, h2, h3, .LegHeading')) {
+            contentHtml += nextElement.outerHTML;
+            nextElement = nextElement.nextElementSibling;
+          }
+          
+          if (contentHtml.length > 150) {
+            provisionsList.push({
+              id: `section-${index}`,
+              title: headingText,
+              number: `${index + 1}`,
+              content: contentHtml
+            });
+          }
+        });
+      } else {
+        // Last resort: Show entire document as one provision
+        provisionsList.push({
+          id: 'full-document',
+          title: 'Full Document',
+          number: '1',
+          content: allContent
+        });
+      }
     }
     
     return provisionsList;
@@ -361,15 +380,15 @@ export function DocumentViewer({
             <div className="p-8 max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-iron-grey mb-6">Explanatory Notes</h2>
               <div className="bg-khaki-beige/30 border-2 border-cool-steel/30 rounded-lg p-6">
-                <p className="text-dim-grey italic">
+                <p className="text-dim-grey italic mb-4">
                   Explanatory notes are not currently available through the API.
                   You can view them directly on legislation.gov.uk.
                 </p>
                 <a
-                  href={`${document.url}/notes`}
+                  href={`${document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '')}/notes/contents`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-cool-steel text-iron-grey rounded-lg hover:bg-iron-grey hover:text-sand-dune transition-all font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-cool-steel text-iron-grey rounded-lg hover:bg-iron-grey hover:text-sand-dune transition-all font-medium"
                 >
                   <ExternalLink size={16} />
                   View Explanatory Notes
