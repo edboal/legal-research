@@ -27,7 +27,6 @@ export function DocumentViewer({
   onToggleFavorite,
   onMoveToFolder,
   onDelete,
-  onAddHighlight,
   onAddComment,
 }: DocumentViewerProps) {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
