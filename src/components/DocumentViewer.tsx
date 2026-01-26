@@ -3,7 +3,7 @@ import { Star, FolderInput, Trash2, MessageSquare, ExternalLink,
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
-         StickyNote, X } from 'lucide-react';
+         StickyNote, X, Info, FileText } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -25,11 +25,10 @@ interface TOCItem {
   level: number;
 }
 
-interface NoteItem {
-  id: string;
-  provisionId: string;
-  provisionTitle: string;
-  text: string;
+interface Amendment {
+  type: 'textual' | 'commencement';
+  title: string;
+  content: string;
 }
 
 interface StatusInfo {
@@ -46,7 +45,7 @@ const HIGHLIGHT_COLORS = [
   { name: 'Pink', color: '#fbcfe8', border: '#f9a8d4' },
 ];
 
-type RightPanelTab = 'notes' | 'comments' | 'highlights' | null;
+type RightPanelTab = 'notes' | null;
 
 export function DocumentViewer({
   document,
@@ -57,6 +56,7 @@ export function DocumentViewer({
   onAddComment,
 }: DocumentViewerProps) {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
+  const [showCopyright, setShowCopyright] = useState(false);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>(null);
   const [newComment, setNewComment] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,7 +66,8 @@ export function DocumentViewer({
   const [selectedProvision, setSelectedProvision] = useState<TOCItem | null>(null);
   const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
   const [provisionContent, setProvisionContent] = useState<string>('');
-  const [allNotes, setAllNotes] = useState<NoteItem[]>([]);
+  const [amendments, setAmendments] = useState<Amendment[]>([]);
+  const [expandedAmendments, setExpandedAmendments] = useState<Set<number>>(new Set());
   const [loadingTOC, setLoadingTOC] = useState(false);
   const [loadingProvision, setLoadingProvision] = useState(false);
   const [tocWidth, setTocWidth] = useState(384);
@@ -77,7 +78,6 @@ export function DocumentViewer({
   const [documentStatus, setDocumentStatus] = useState<StatusInfo | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Resizing logic
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
@@ -323,7 +323,7 @@ export function DocumentViewer({
       if (body) {
         const processedContent = processProvisionXML(body);
         setProvisionContent(processedContent);
-        extractNotes(xmlDoc, item);
+        extractAmendments(xmlDoc, item);
       } else {
         setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
       }
@@ -386,32 +386,49 @@ export function DocumentViewer({
     }
   };
 
-  const extractNotes = (xmlDoc: XMLDocument, provision: TOCItem) => {
-    const notes = xmlDoc.querySelectorAll('CommentaryRef, FootnoteRef, MarginNoteRef');
-    const noteItems: NoteItem[] = [];
+  const extractAmendments = (xmlDoc: XMLDocument, provision: TOCItem) => {
+    const amendmentsList: Amendment[] = [];
     
-    notes.forEach((note: Element, idx: number) => {
-      const noteRef = note.getAttribute('Ref') || '';
-      const commentary = xmlDoc.querySelector(`Commentary[id="${noteRef}"]`);
-      const footnote = xmlDoc.querySelector(`Footnote[id="${noteRef}"]`);
-      const actualNote = commentary || footnote;
-      
-      if (actualNote) {
-        noteItems.push({
-          id: `note-${provision.id}-${idx}`,
-          provisionId: provision.id,
-          provisionTitle: `${provision.number} ${provision.title}`,
-          text: actualNote.textContent || ''
-        });
+    const commentaryRefs = xmlDoc.querySelectorAll('CommentaryRef');
+    commentaryRefs.forEach((ref: Element) => {
+      const commentaryId = ref.getAttribute('Ref');
+      if (commentaryId) {
+        const commentary = xmlDoc.querySelector(`Commentary[id="${commentaryId}"]`);
+        if (commentary) {
+          const type = commentary.getAttribute('Type');
+          const text = commentary.textContent || '';
+          
+          if (type === 'F' || type === 'M') {
+            amendmentsList.push({
+              type: 'textual',
+              title: 'Textual Amendment',
+              content: text
+            });
+          } else if (type === 'I' || type === 'C') {
+            amendmentsList.push({
+              type: 'commencement',
+              title: 'Commencement Information',
+              content: text
+            });
+          }
+        }
       }
     });
     
-    if (noteItems.length > 0) {
-      setAllNotes(prev => {
-        const filtered = prev.filter(n => n.provisionId !== provision.id);
-        return [...filtered, ...noteItems];
-      });
-    }
+    setAmendments(amendmentsList);
+    setExpandedAmendments(new Set());
+  };
+
+  const toggleAmendment = (index: number) => {
+    setExpandedAmendments(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
   };
 
   const navigateProvision = (direction: 'prev' | 'next') => {
@@ -457,13 +474,12 @@ export function DocumentViewer({
   }, [tableOfContents, searchQuery]);
 
   const filteredNotes = useMemo(() => {
-    if (!notesSearchQuery.trim()) return allNotes;
+    if (!notesSearchQuery.trim()) return document?.comments || [];
     const query = notesSearchQuery.toLowerCase();
-    return allNotes.filter(note => 
-      note.text.toLowerCase().includes(query) ||
-      note.provisionTitle.toLowerCase().includes(query)
+    return (document?.comments || []).filter(comment => 
+      comment.text.toLowerCase().includes(query)
     );
-  }, [allNotes, notesSearchQuery]);
+  }, [document?.comments, notesSearchQuery]);
 
   const handleTextSelection = () => {
     if (!highlightMode) return;
@@ -598,6 +614,37 @@ export function DocumentViewer({
         <ArrowUp size={24} />
       </button>
 
+      {/* Copyright Modal */}
+      {showCopyright && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl mx-4 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-xl font-bold text-iron-grey flex items-center gap-2">
+                <Info size={24} className="text-bronze" />
+                Copyright & Licensing
+              </h2>
+              <button onClick={() => setShowCopyright(false)} className="text-dim-grey hover:text-iron-grey">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="text-sm text-iron-grey space-y-4 leading-relaxed">
+              <p>
+                All content is available under the <strong>Open Government Licence v3.0</strong> except where otherwise stated.
+              </p>
+              <p>
+                This site additionally contains content derived from <strong>EUR-Lex</strong>, reused under the terms of the Commission Decision 2011/833/EU on the reuse of documents from the EU institutions.
+              </p>
+              <p>
+                For more information see the <a href="https://eur-lex.europa.eu/content/legal-notice/legal-notice.html" target="_blank" rel="noopener noreferrer" className="text-bronze underline hover:text-iron-grey">EUR-Lex public statement on re-use</a>.
+              </p>
+              <div className="pt-4 border-t border-dim-grey/30 font-semibold">
+                © Crown and database right
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
@@ -630,10 +677,18 @@ export function DocumentViewer({
                 <AlertTriangle size={14} />
                 <span>Outstanding Changes</span>
               </a>
+
+              <button
+                onClick={() => setShowCopyright(true)}
+                className="text-cool-steel hover:text-white flex items-center gap-1"
+              >
+                <Info size={14} />
+                <span>Copyright & Licensing</span>
+              </button>
             </div>
           </div>
 
-          {/* Simplified Actions */}
+          {/* Actions */}
           <div className="flex gap-1.5 flex-shrink-0">
             <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`} title="Toggle favorite">
               <Star size={18} fill={document.isFavorite ? 'currentColor' : 'none'} />
@@ -821,6 +876,31 @@ export function DocumentViewer({
                 </div>
                 
                 <div className="legislation-provision" dangerouslySetInnerHTML={{ __html: provisionContent }} />
+
+                {/* Amendments Accordion */}
+                {amendments.length > 0 && (
+                  <div className="amendments-accordion">
+                    {amendments.map((amendment, idx) => (
+                      <div key={idx}>
+                        <button
+                          onClick={() => toggleAmendment(idx)}
+                          className={`accordion-button ${expandedAmendments.has(idx) ? 'active' : ''}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <FileText size={16} />
+                            {amendment.title}
+                          </span>
+                          {expandedAmendments.has(idx) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {expandedAmendments.has(idx) && (
+                          <div className="accordion-content">
+                            {amendment.content}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-center px-8">
@@ -837,135 +917,80 @@ export function DocumentViewer({
           </div>
         </div>
 
-        {/* Right Panel with Tabs */}
-        {rightPanelTab !== null && (
+        {/* Right Panel - Notes Only */}
+        {rightPanelTab === 'notes' && (
           <div className="w-80 border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
-            {/* Tab Header */}
             <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
-              <div className="flex items-center border-b border-dim-grey/30">
-                <button
-                  onClick={() => setRightPanelTab('notes')}
-                  className={`flex-1 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
-                    rightPanelTab === 'notes' ? 'bg-white text-iron-grey' : 'text-white hover:bg-dim-grey'
-                  }`}
-                >
+              <div className="flex items-center justify-between p-4 border-b border-dim-grey/30">
+                <h3 className="text-white font-semibold flex items-center gap-2">
                   <StickyNote size={16} />
-                  Notes {allNotes.length > 0 && `(${allNotes.length})`}
-                </button>
-                <button
-                  onClick={() => setRightPanelTab('comments')}
-                  className={`flex-1 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
-                    rightPanelTab === 'comments' ? 'bg-white text-iron-grey' : 'text-white hover:bg-dim-grey'
-                  }`}
-                >
-                  <MessageSquare size={16} />
-                  Comments {document.comments.length > 0 && `(${document.comments.length})`}
-                </button>
+                  User Notes ({document.comments.length})
+                </h3>
                 <button
                   onClick={() => setRightPanelTab(null)}
-                  className="px-3 py-3 text-white hover:bg-dim-grey transition-colors"
-                  title="Close panel"
+                  className="text-white hover:text-bronze transition-colors"
                 >
                   <X size={16} />
                 </button>
               </div>
 
-              {/* Tab Content Header */}
-              {rightPanelTab === 'notes' && (
-                <div className="p-4">
-                  <div className="relative">
-                    <input 
-                      type="text" 
-                      value={notesSearchQuery} 
-                      onChange={(e) => setNotesSearchQuery(e.target.value)} 
-                      placeholder="Search notes..." 
-                      className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
-                    />
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
-                  </div>
-                </div>
-              )}
-
-              {rightPanelTab === 'comments' && (
-                <div className="p-4 space-y-2">
-                  <textarea 
-                    value={newComment} 
-                    onChange={(e) => setNewComment(e.target.value)} 
-                    placeholder="Add a comment..." 
-                    className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30" 
-                    rows={3} 
+              <div className="p-4 space-y-2">
+                <div className="relative mb-2">
+                  <input 
+                    type="text" 
+                    value={notesSearchQuery} 
+                    onChange={(e) => setNotesSearchQuery(e.target.value)} 
+                    placeholder="Search notes..." 
+                    className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
                   />
-                  <button 
-                    onClick={handleAddComment} 
-                    disabled={!newComment.trim()} 
-                    className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50"
-                  >
-                    Add Comment
-                  </button>
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
                 </div>
-              )}
+                
+                <textarea 
+                  value={newComment} 
+                  onChange={(e) => setNewComment(e.target.value)} 
+                  placeholder="Add a note..." 
+                  className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30" 
+                  rows={3} 
+                />
+                <button 
+                  onClick={handleAddComment} 
+                  disabled={!newComment.trim()} 
+                  className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50"
+                >
+                  Add Note
+                </button>
+              </div>
             </div>
 
-            {/* Tab Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-sand-dune">
-              {rightPanelTab === 'notes' && (
-                filteredNotes.length === 0 ? (
-                  <div className="text-center text-dim-grey/60 py-8 italic text-sm">
-                    {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes in this provision'}
-                  </div>
-                ) : (
-                  filteredNotes.map(note => (
-                    <div key={note.id} className="p-3 bg-white rounded-lg border border-bronze/30 shadow-sm">
-                      <div className="text-xs font-semibold text-bronze mb-1">
-                        {note.provisionTitle}
-                      </div>
-                      <div className="text-sm text-iron-grey leading-relaxed">{note.text}</div>
+              {filteredNotes.length === 0 ? (
+                <div className="text-center text-dim-grey/60 py-8 italic text-sm">
+                  {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes yet'}
+                </div>
+              ) : (
+                filteredNotes.map(comment => (
+                  <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
+                    <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
+                      {comment.timestamp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
-                  ))
-                )
-              )}
-
-              {rightPanelTab === 'comments' && (
-                document.comments.length === 0 ? (
-                  <div className="text-center text-dim-grey/60 py-8 italic text-sm">
-                    No comments yet
+                    <div className="text-sm text-iron-grey leading-relaxed">{comment.text}</div>
                   </div>
-                ) : (
-                  document.comments.map(comment => (
-                    <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
-                      <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
-                        {comment.timestamp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div className="text-sm text-iron-grey leading-relaxed">{comment.text}</div>
-                    </div>
-                  ))
-                )
+                ))
               )}
             </div>
           </div>
         )}
 
-        {/* Tab Trigger Buttons (when panel closed) */}
+        {/* Notes Button (when panel closed) */}
         {rightPanelTab === null && (
-          <div className="border-l-2 border-dim-grey bg-white p-2 flex flex-col gap-2">
+          <div className="border-l-2 border-dim-grey bg-white p-2">
             <button
               onClick={() => setRightPanelTab('notes')}
               className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
-              title="Notes"
+              title="User Notes"
             >
               <StickyNote size={20} className="text-iron-grey" />
-              {allNotes.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {allNotes.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setRightPanelTab('comments')}
-              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
-              title="Comments"
-            >
-              <MessageSquare size={20} className="text-iron-grey" />
               {document.comments.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {document.comments.length}
