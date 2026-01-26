@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
-         ChevronRight as NextIcon, Highlighter, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+         ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -73,13 +73,13 @@ export function DocumentViewer({
     };
 
     if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      window.document.addEventListener('mousemove', handleMouseMove);
+      window.document.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      window.document.removeEventListener('mousemove', handleMouseMove);
+      window.document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
 
