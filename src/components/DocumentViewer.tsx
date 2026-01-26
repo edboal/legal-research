@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, 
+import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
          ChevronLeft, ChevronRight, List, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle } from 'lucide-react';
 import type { Document, Folder, Comment } from '../types';
