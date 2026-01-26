@@ -25,12 +25,6 @@ interface TOCItem {
   level: number;
 }
 
-interface Amendment {
-  type: 'textual' | 'commencement';
-  title: string;
-  content: string;
-}
-
 interface StatusInfo {
   label: string;
   color: string;
@@ -66,8 +60,6 @@ export function DocumentViewer({
   const [selectedProvision, setSelectedProvision] = useState<TOCItem | null>(null);
   const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
   const [provisionContent, setProvisionContent] = useState<string>('');
-  const [amendments, setAmendments] = useState<Amendment[]>([]);
-  const [expandedAmendments, setExpandedAmendments] = useState<Set<number>>(new Set());
   const [loadingTOC, setLoadingTOC] = useState(false);
   const [loadingProvision, setLoadingProvision] = useState(false);
   const [tocWidth, setTocWidth] = useState(384);
@@ -76,6 +68,7 @@ export function DocumentViewer({
   const [highlightMode, setHighlightMode] = useState(false);
   const [selectedHighlightColor, setSelectedHighlightColor] = useState(0);
   const [documentStatus, setDocumentStatus] = useState<StatusInfo | null>(null);
+  const [outstandingChangesUrl, setOutstandingChangesUrl] = useState<string>('');
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -121,7 +114,12 @@ export function DocumentViewer({
     const fetchTOC = async () => {
       setLoadingTOC(true);
       try {
-        const baseUrl = document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '');
+        // Extract base URL from document URL
+        // Example: https://www.legislation.gov.uk/ukpga/2018/12/2020-12-31/data.htm
+        // Should become: https://www.legislation.gov.uk/ukpga/2018/12
+        const urlParts = document.url.match(/^(https:\/\/www\.legislation\.gov\.uk\/[^\/]+\/[^\/]+\/[^\/]+)/);
+        const baseUrl = urlParts ? urlParts[1] : document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '');
+        
         const tocUrl = `${baseUrl}/contents/data.xml`;
         
         const response = await fetch(`/api/legislation?url=${encodeURIComponent(tocUrl)}`);
@@ -134,6 +132,9 @@ export function DocumentViewer({
         const metadata = xmlDoc.querySelector('Metadata');
         const status = extractStatusFromMetadata(metadata);
         setDocumentStatus(status);
+        
+        // Set outstanding changes URL - same base URL + /changes/affected
+        setOutstandingChangesUrl(`${baseUrl}/changes/affected`);
         
         const toc = parseTOCFromXML(xmlDoc);
         setTableOfContents(toc);
@@ -321,9 +322,8 @@ export function DocumentViewer({
       
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
-        const processedContent = processProvisionXML(body);
+        const processedContent = processProvisionXML(body, xmlDoc);
         setProvisionContent(processedContent);
-        extractAmendments(xmlDoc, item);
       } else {
         setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
       }
@@ -342,15 +342,76 @@ export function DocumentViewer({
     }
   };
 
-  const processProvisionXML = (body: Element): string => {
+  const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
     const clone = body.cloneNode(true) as Element;
     
-    const elementsWithAttrs = clone.querySelectorAll('[ChangeId], [CommentaryRef]');
-    elementsWithAttrs.forEach(el => {
-      el.removeAttribute('ChangeId');
-      el.removeAttribute('CommentaryRef');
+    // First, handle commentary refs and insert accordions
+    const commentaryRefs = Array.from(clone.querySelectorAll('CommentaryRef'));
+    const accordionsToInsert: { provision: Element, html: string }[] = [];
+    
+    commentaryRefs.forEach((ref: Element) => {
+      const commentaryId = ref.getAttribute('Ref');
+      
+      if (commentaryId) {
+        const commentary = xmlDoc.querySelector(`Commentary[id="${commentaryId}"]`);
+        if (commentary) {
+          const type = commentary.getAttribute('Type');
+          const text = commentary.textContent || '';
+          
+          let title = 'Note';
+          if (type === 'F' || type === 'M') {
+            title = 'Textual Amendment';
+          } else if (type === 'I' || type === 'C') {
+            title = 'Commencement Information';
+          }
+          
+          // Find the parent provision
+          const parentProvision = ref.closest('P1, P2, P3, P4');
+          if (parentProvision) {
+            const accordionHtml = `
+              <div class="amendment-accordion">
+                <button class="accordion-button" onclick="this.classList.toggle('active'); const content = this.nextElementSibling; content.style.display = content.style.display === 'none' ? 'block' : 'none';">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    ${title}
+                  </span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                <div class="accordion-content" style="display: none;">${text}</div>
+              </div>
+            `;
+            
+            accordionsToInsert.push({ provision: parentProvision, html: accordionHtml });
+          }
+        }
+      }
+      
+      // Remove the commentary ref
+      ref.remove();
     });
     
+    // Insert accordions after provisions
+    accordionsToInsert.forEach(({ provision, html }) => {
+      const div = window.document.createElement('div');
+      div.innerHTML = html;
+      provision.parentNode?.insertBefore(div.firstElementChild!, provision.nextSibling);
+    });
+    
+    // Remove other XML attributes
+    const elementsWithAttrs = clone.querySelectorAll('[ChangeId]');
+    elementsWithAttrs.forEach(el => {
+      el.removeAttribute('ChangeId');
+    });
+    
+    // Process internal references
     const references = clone.querySelectorAll('Reference, InternalLink, Citation');
     references.forEach((ref: Element) => {
       const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
@@ -384,51 +445,6 @@ export function DocumentViewer({
         fetchProvision(provision, idx);
       }
     }
-  };
-
-  const extractAmendments = (xmlDoc: XMLDocument, _provision: TOCItem) => {
-    const amendmentsList: Amendment[] = [];
-    
-    const commentaryRefs = xmlDoc.querySelectorAll('CommentaryRef');
-    commentaryRefs.forEach((ref: Element) => {
-      const commentaryId = ref.getAttribute('Ref');
-      if (commentaryId) {
-        const commentary = xmlDoc.querySelector(`Commentary[id="${commentaryId}"]`);
-        if (commentary) {
-          const type = commentary.getAttribute('Type');
-          const text = commentary.textContent || '';
-          
-          if (type === 'F' || type === 'M') {
-            amendmentsList.push({
-              type: 'textual',
-              title: 'Textual Amendment',
-              content: text
-            });
-          } else if (type === 'I' || type === 'C') {
-            amendmentsList.push({
-              type: 'commencement',
-              title: 'Commencement Information',
-              content: text
-            });
-          }
-        }
-      }
-    });
-    
-    setAmendments(amendmentsList);
-    setExpandedAmendments(new Set());
-  };
-
-  const toggleAmendment = (index: number) => {
-    setExpandedAmendments(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
   };
 
   const navigateProvision = (direction: 'prev' | 'next') => {
@@ -673,10 +689,12 @@ export function DocumentViewer({
                 <span>View on legislation.gov.uk</span>
               </a>
               
-              <a href={`${document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '')}/changes`} target="_blank" rel="noopener noreferrer" className="text-bronze hover:text-white flex items-center gap-1 font-medium">
-                <AlertTriangle size={14} />
-                <span>Outstanding Changes</span>
-              </a>
+              {outstandingChangesUrl && (
+                <a href={outstandingChangesUrl} target="_blank" rel="noopener noreferrer" className="text-bronze hover:text-white flex items-center gap-1 font-medium">
+                  <AlertTriangle size={14} />
+                  <span>Outstanding Changes</span>
+                </a>
+              )}
 
               <button
                 onClick={() => setShowCopyright(true)}
@@ -876,31 +894,6 @@ export function DocumentViewer({
                 </div>
                 
                 <div className="legislation-provision" dangerouslySetInnerHTML={{ __html: provisionContent }} />
-
-                {/* Amendments Accordion */}
-                {amendments.length > 0 && (
-                  <div className="amendments-accordion">
-                    {amendments.map((amendment, idx) => (
-                      <div key={idx}>
-                        <button
-                          onClick={() => toggleAmendment(idx)}
-                          className={`accordion-button ${expandedAmendments.has(idx) ? 'active' : ''}`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <FileText size={16} />
-                            {amendment.title}
-                          </span>
-                          {expandedAmendments.has(idx) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                        {expandedAmendments.has(idx) && (
-                          <div className="accordion-content">
-                            {amendment.content}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-center px-8">
