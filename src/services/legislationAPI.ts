@@ -117,11 +117,16 @@ export const legislationAPI = {
     try {
       console.log('🔍 Fetching document:', url);
       
-      // Clean URL - only remove /contents and /data extensions
+      // Clean URL - remove /contents, data extensions, and date paths
       let baseUrl = url
         .replace('/contents', '')
         .replace('/data.htm', '')
         .replace('/data.html', '');
+      
+      // Remove date paths like /2026-01-06 or /enacted
+      // Match pattern: /YYYY-MM-DD or /YYYY/MM/DD
+      baseUrl = baseUrl.replace(/\/\d{4}-\d{2}-\d{2}/g, '');
+      baseUrl = baseUrl.replace(/\/enacted/g, '');
       
       console.log('🧹 Cleaned base URL:', baseUrl);
       
