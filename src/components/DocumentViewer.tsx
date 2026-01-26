@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
-         CheckCircle, AlertTriangle, Loader } from 'lucide-react';
+         CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
+         ChevronRight as NextIcon, Highlighter, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -23,6 +24,13 @@ interface TOCItem {
   level: number;
 }
 
+const HIGHLIGHT_COLORS = [
+  { name: 'Yellow', color: '#fef08a', border: '#fde047' },
+  { name: 'Green', color: '#bbf7d0', border: '#86efac' },
+  { name: 'Blue', color: '#bfdbfe', border: '#93c5fd' },
+  { name: 'Pink', color: '#fbcfe8', border: '#f9a8d4' },
+];
+
 export function DocumentViewer({
   document,
   folders,
@@ -38,10 +46,56 @@ export function DocumentViewer({
   const [tableOfContents, setTableOfContents] = useState<TOCItem[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProvision, setSelectedProvision] = useState<TOCItem | null>(null);
+  const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
   const [provisionContent, setProvisionContent] = useState<string>('');
   const [loadingTOC, setLoadingTOC] = useState(false);
   const [loadingProvision, setLoadingProvision] = useState(false);
+  const [tocWidth, setTocWidth] = useState(384); // 96 * 4 = 384px (w-96)
+  const [isResizing, setIsResizing] = useState(false);
+  const [tocCollapsed, setTocCollapsed] = useState(false);
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [selectedHighlightColor, setSelectedHighlightColor] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Resizing logic
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = e.clientX;
+      if (newWidth >= 200 && newWidth <= 600) {
+        setTocWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  // Get flat list of all provisions for navigation
+  const flatProvisions = useMemo(() => {
+    const flatten = (items: TOCItem[]): TOCItem[] => {
+      return items.reduce((acc: TOCItem[], item) => {
+        acc.push(item);
+        if (item.children.length > 0) {
+          acc.push(...flatten(item.children));
+        }
+        return acc;
+      }, []);
+    };
+    return flatten(tableOfContents);
+  }, [tableOfContents]);
 
   // Fetch Table of Contents
   useEffect(() => {
@@ -65,9 +119,8 @@ export function DocumentViewer({
         const toc = parseTOCFromXML(xmlDoc);
         setTableOfContents(toc);
         
-        // Auto-expand first level
-        const firstLevelIds = toc.map(item => item.id);
-        setExpandedItems(new Set(firstLevelIds));
+        // Start collapsed
+        setExpandedItems(new Set());
         
       } catch (error) {
         console.error('Error fetching TOC:', error);
@@ -80,7 +133,6 @@ export function DocumentViewer({
     fetchTOC();
   }, [document?.id]);
 
-  // Parse TOC from CLML XML
   const parseTOCFromXML = (xmlDoc: XMLDocument): TOCItem[] => {
     const items: TOCItem[] = [];
     
@@ -182,9 +234,16 @@ export function DocumentViewer({
     setTableOfContents(items);
   };
 
-  const fetchProvision = async (item: TOCItem) => {
+  const fetchProvision = async (item: TOCItem, index?: number) => {
     setLoadingProvision(true);
     setSelectedProvision(item);
+    
+    if (index !== undefined) {
+      setCurrentProvisionIndex(index);
+    } else {
+      const idx = flatProvisions.findIndex(p => p.id === item.id);
+      setCurrentProvisionIndex(idx >= 0 ? idx : 0);
+    }
     
     try {
       if (!item.url) {
@@ -203,24 +262,32 @@ export function DocumentViewer({
       
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
-        const tempDiv = window.document.createElement('div');
-        tempDiv.innerHTML = new XMLSerializer().serializeToString(body);
-        setProvisionContent(tempDiv.innerHTML);
+        // Convert XML to HTML preserving structure
+        const serializer = new XMLSerializer();
+        const xmlString = serializer.serializeToString(body);
+        setProvisionContent(xmlString);
       } else {
-        setProvisionContent('<p>Content not available</p>');
+        setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
       }
       
     } catch (error) {
       console.error('Error:', error);
       setProvisionContent(`
         <div class="p-6 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
-          <h3 class="font-bold text-yellow-900">Unable to Load</h3>
-          <a href="${item.url}" target="_blank" class="text-blue-600 underline">View on legislation.gov.uk</a>
+          <h3 class="font-bold text-yellow-900 mb-2">Unable to Load</h3>
+          <a href="${item.url}" target="_blank" class="text-blue-600 underline hover:text-blue-800">View on legislation.gov.uk</a>
         </div>
       `);
     } finally {
       setLoadingProvision(false);
       scrollToTop();
+    }
+  };
+
+  const navigateProvision = (direction: 'prev' | 'next') => {
+    const newIndex = direction === 'prev' ? currentProvisionIndex - 1 : currentProvisionIndex + 1;
+    if (newIndex >= 0 && newIndex < flatProvisions.length) {
+      fetchProvision(flatProvisions[newIndex], newIndex);
     }
   };
 
@@ -258,6 +325,36 @@ export function DocumentViewer({
     
     return filterItems(tableOfContents);
   }, [tableOfContents, searchQuery]);
+
+  const handleTextSelection = () => {
+    if (!highlightMode) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+
+    const range = selection.getRangeAt(0);
+    const span = window.document.createElement('span');
+    const color = HIGHLIGHT_COLORS[selectedHighlightColor];
+    span.style.backgroundColor = color.color;
+    span.style.borderBottom = `2px solid ${color.border}`;
+    span.style.cursor = 'pointer';
+    span.title = 'Click to remove highlight';
+    
+    span.onclick = () => {
+      const parent = span.parentNode;
+      if (parent) {
+        const text = window.document.createTextNode(span.textContent || '');
+        parent.replaceChild(text, span);
+      }
+    };
+
+    try {
+      range.surroundContents(span);
+      selection.removeAllRanges();
+    } catch (e) {
+      console.error('Could not highlight selection:', e);
+    }
+  };
 
   const getDocumentStatus = () => {
     if (!document) return null;
@@ -301,14 +398,14 @@ export function DocumentViewer({
     if (!newComment.trim() || !document) return;
     onAddComment(document.id, {
       id: crypto.randomUUID(),
-      position: 0,
+      position: currentProvisionIndex,
       text: newComment.trim(),
       timestamp: new Date(),
     });
     setNewComment('');
   };
 
-  const renderTOCItem = (item: TOCItem) => {
+  const renderTOCItem = (item: TOCItem, globalIndex: number) => {
     const isExpanded = expandedItems.has(item.id);
     const hasChildren = item.children.length > 0;
     const isSelected = selectedProvision?.id === item.id;
@@ -327,14 +424,14 @@ export function DocumentViewer({
                 e.stopPropagation();
                 toggleExpand(item.id);
               }}
-              className="mt-1 text-dim-grey hover:text-iron-grey"
+              className="mt-1 text-dim-grey hover:text-iron-grey flex-shrink-0"
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
           )}
           
           <div 
-            onClick={() => fetchProvision(item)}
+            onClick={() => fetchProvision(item, globalIndex)}
             className="flex-1 min-w-0"
           >
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -357,7 +454,10 @@ export function DocumentViewer({
         
         {hasChildren && isExpanded && (
           <div>
-            {item.children.map(child => renderTOCItem(child))}
+            {item.children.map((child, idx) => {
+              const childGlobalIndex = globalIndex + 1 + idx;
+              return renderTOCItem(child, childGlobalIndex);
+            })}
           </div>
         )}
       </div>
@@ -383,6 +483,7 @@ export function DocumentViewer({
       <button
         onClick={scrollToTop}
         className="fixed bottom-8 right-8 w-12 h-12 bg-iron-grey text-white rounded-full shadow-lg hover:bg-bronze transition-all z-50 flex items-center justify-center"
+        title="Scroll to top"
       >
         <ArrowUp size={24} />
       </button>
@@ -422,12 +523,12 @@ export function DocumentViewer({
           </div>
 
           <div className="flex gap-1.5 flex-shrink-0">
-            <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`}>
+            <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`} title="Toggle favorite">
               <Star size={18} fill={document.isFavorite ? 'currentColor' : 'none'} />
             </button>
 
             <div className="relative">
-              <button onClick={() => setShowFolderMenu(!showFolderMenu)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all">
+              <button onClick={() => setShowFolderMenu(!showFolderMenu)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all" title="Move to folder">
                 <FolderInput size={18} />
               </button>
 
@@ -445,7 +546,34 @@ export function DocumentViewer({
               )}
             </div>
 
-            <button onClick={() => setShowComments(!showComments)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative">
+            {/* Highlight Mode */}
+            <div className="relative">
+              <button 
+                onClick={() => setHighlightMode(!highlightMode)} 
+                className={`p-2 rounded-lg transition-all ${highlightMode ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`}
+                title="Highlight mode"
+              >
+                <Highlighter size={18} />
+              </button>
+
+              {highlightMode && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border-2 border-iron-grey rounded-lg shadow-xl z-10 p-2">
+                  <div className="text-xs font-bold text-iron-grey mb-2 px-2">Highlight Color:</div>
+                  {HIGHLIGHT_COLORS.map((color, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedHighlightColor(idx)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-sand-dune ${selectedHighlightColor === idx ? 'bg-sand-dune' : ''}`}
+                    >
+                      <div className="w-6 h-6 rounded" style={{ backgroundColor: color.color, border: `2px solid ${color.border}` }} />
+                      <span className="text-sm text-iron-grey">{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => setShowComments(!showComments)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative" title="Toggle comments">
               <MessageSquare size={18} />
               {document.comments.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -454,7 +582,7 @@ export function DocumentViewer({
               )}
             </button>
 
-            <button onClick={() => onDelete(document.id)} className="p-2 bg-dim-grey text-white hover:bg-red-600 rounded-lg transition-all">
+            <button onClick={() => onDelete(document.id)} className="p-2 bg-dim-grey text-white hover:bg-red-600 rounded-lg transition-all" title="Delete document">
               <Trash2 size={18} />
             </button>
           </div>
@@ -462,74 +590,154 @@ export function DocumentViewer({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-96 border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-dim-grey">
-            <h2 className="text-lg font-bold text-iron-grey mb-3">Table of Contents</h2>
-            
-            <div className="relative">
-              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search provisions..." className="w-full px-4 py-2 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30 text-sm" />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-dim-grey" />
-            </div>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-2">
-            {loadingTOC ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader className="w-8 h-8 text-bronze animate-spin mb-2" />
-                <p className="text-sm text-dim-grey">Loading contents...</p>
+        {/* TOC Panel - Resizable */}
+        {!tocCollapsed && (
+          <div 
+            className="border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden relative"
+            style={{ width: `${tocWidth}px`, minWidth: '200px', maxWidth: '600px' }}
+          >
+            <div className="p-4 border-b border-dim-grey">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-bold text-iron-grey">Table of Contents</h2>
+                <button
+                  onClick={() => setTocCollapsed(true)}
+                  className="p-1 hover:bg-sand-dune rounded transition-colors"
+                  title="Hide table of contents"
+                >
+                  <PanelLeftClose size={18} className="text-dim-grey" />
+                </button>
               </div>
-            ) : filteredTOC.length > 0 ? (
-              filteredTOC.map(item => renderTOCItem(item))
+              
+              <div className="relative">
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search provisions..." className="w-full px-4 py-2 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30 text-sm" />
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-dim-grey" />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-2">
+              {loadingTOC ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader className="w-8 h-8 text-bronze animate-spin mb-2" />
+                  <p className="text-sm text-dim-grey">Loading contents...</p>
+                </div>
+              ) : filteredTOC.length > 0 ? (
+                (() => {
+                  let globalIdx = 0;
+                  return filteredTOC.map(item => {
+                    const startIdx = globalIdx;
+                    globalIdx += 1 + item.children.length;
+                    return renderTOCItem(item, startIdx);
+                  });
+                })()
+              ) : (
+                <div className="text-center py-8 text-dim-grey text-sm">
+                  {searchQuery ? `No match for "${searchQuery}"` : 'No contents available'}
+                </div>
+              )}
+            </div>
+
+            {/* Resize Handle */}
+            <div
+              ref={resizeRef}
+              className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-bronze transition-colors"
+              onMouseDown={() => setIsResizing(true)}
+            />
+          </div>
+        )}
+
+        {/* Show TOC Button */}
+        {tocCollapsed && (
+          <button
+            onClick={() => setTocCollapsed(false)}
+            className="absolute top-20 left-4 z-10 p-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all shadow-lg"
+            title="Show table of contents"
+          >
+            <PanelLeftOpen size={20} />
+          </button>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Navigation Bar */}
+          {selectedProvision && (
+            <div className="bg-sand-dune border-b-2 border-dim-grey px-6 py-3 flex items-center justify-between flex-shrink-0">
+              <button
+                onClick={() => navigateProvision('prev')}
+                disabled={currentProvisionIndex === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
+              >
+                <PrevIcon size={16} />
+                Previous
+              </button>
+              
+              <div className="text-center">
+                <div className="text-xs text-dim-grey font-medium">
+                  {currentProvisionIndex + 1} of {flatProvisions.length}
+                </div>
+                <div className="text-sm font-bold text-iron-grey">
+                  {selectedProvision.number} {selectedProvision.title}
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigateProvision('next')}
+                disabled={currentProvisionIndex === flatProvisions.length - 1}
+                className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
+              >
+                Next
+                <NextIcon size={16} />
+              </button>
+            </div>
+          )}
+
+          <div 
+            ref={contentRef} 
+            className="flex-1 overflow-y-auto bg-white"
+            onMouseUp={handleTextSelection}
+          >
+            {loadingProvision ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <Loader className="w-12 h-12 text-bronze animate-spin mb-4" />
+                <p className="text-lg text-iron-grey">Loading provision...</p>
+              </div>
+            ) : selectedProvision ? (
+              <div className="p-8 max-w-4xl mx-auto">
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-3 mb-2">
+                    {selectedProvision.number && (
+                      <span className="text-2xl font-bold text-bronze">
+                        {selectedProvision.number}
+                      </span>
+                    )}
+                    <h2 className="text-2xl font-bold text-iron-grey">
+                      {selectedProvision.title}
+                    </h2>
+                  </div>
+                  {selectedProvision.status && (
+                    <span className="inline-block px-3 py-1 text-sm rounded bg-amber-100 text-amber-800 font-medium">
+                      {selectedProvision.status}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="legislation-provision" dangerouslySetInnerHTML={{ __html: provisionContent }} />
+              </div>
             ) : (
-              <div className="text-center py-8 text-dim-grey text-sm">
-                {searchQuery ? `No match for "${searchQuery}"` : 'No contents available'}
+              <div className="flex items-center justify-center h-full text-center px-8">
+                <div>
+                  <p className="text-xl font-semibold text-iron-grey mb-2">
+                    Select a provision
+                  </p>
+                  <p className="text-sm text-dim-grey">
+                    Click any item in the table of contents
+                  </p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        <div ref={contentRef} className="flex-1 overflow-y-auto bg-white">
-          {loadingProvision ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <Loader className="w-12 h-12 text-bronze animate-spin mb-4" />
-              <p className="text-lg text-iron-grey">Loading provision...</p>
-            </div>
-          ) : selectedProvision ? (
-            <div className="p-8 max-w-4xl mx-auto">
-              <div className="mb-6">
-                <div className="flex items-baseline gap-3 mb-2">
-                  {selectedProvision.number && (
-                    <span className="text-2xl font-bold text-bronze">
-                      {selectedProvision.number}
-                    </span>
-                  )}
-                  <h2 className="text-2xl font-bold text-iron-grey">
-                    {selectedProvision.title}
-                  </h2>
-                </div>
-                {selectedProvision.status && (
-                  <span className="inline-block px-3 py-1 text-sm rounded bg-amber-100 text-amber-800 font-medium">
-                    {selectedProvision.status}
-                  </span>
-                )}
-              </div>
-              
-              <div className="legislation-provision prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: provisionContent }} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-center px-8">
-              <div>
-                <p className="text-xl font-semibold text-iron-grey mb-2">
-                  Select a provision
-                </p>
-                <p className="text-sm text-dim-grey">
-                  Click any item in the left panel
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
+        {/* Comments Sidebar */}
         {showComments && (
           <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
             <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
