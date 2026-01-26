@@ -3,7 +3,7 @@ import { Star, FolderInput, Trash2, ExternalLink,
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
-         StickyNote, X, Info, FileText } from 'lucide-react';
+         StickyNote, X, Info } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
