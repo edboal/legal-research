@@ -405,11 +405,17 @@ export function DocumentViewer({
       provision.parentNode?.insertBefore(div.firstElementChild!, provision.nextSibling);
     });
     
-    // Remove other XML attributes
-    const elementsWithAttrs = clone.querySelectorAll('[ChangeId]');
-    elementsWithAttrs.forEach(el => {
-      el.removeAttribute('ChangeId');
-    });
+    // Remove ALL XML attributes
+const elementsWithAttrs = clone.querySelectorAll('*');
+elementsWithAttrs.forEach(el => {
+  el.removeAttribute('ChangeId');
+  el.removeAttribute('CommentaryRef');
+  el.removeAttribute('AltVersionRefs');
+  el.removeAttribute('Status');
+  el.removeAttribute('Match');
+  el.removeAttribute('RestrictStartDate');
+  el.removeAttribute('RestrictEndDate');
+});
     
     // Process internal references
     const references = clone.querySelectorAll('Reference, InternalLink, Citation');
