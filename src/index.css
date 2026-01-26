@@ -23,130 +23,303 @@
   overflow: hidden;
 }
 
-/* Performance optimizations */
-.legislation-content {
-  /* Use GPU acceleration for smooth scrolling */
-  transform: translateZ(0);
-  will-change: scroll-position;
-  
-  /* Contain layout changes */
-  contain: layout style paint;
-}
+/* ========================================
+   PROFESSIONAL LEGAL DOCUMENT FORMATTING
+   ======================================== */
 
-/* Enhanced legislation content styling */
-.legislation-content {
+.legislation-provision {
   @apply text-iron-grey;
-  line-height: 1.75;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 16px;
+  line-height: 1.8;
+  max-width: 100%;
 }
 
-.legislation-content h1,
-.legislation-content h2,
-.legislation-content h3,
-.legislation-content h4,
-.legislation-content .LegHeading,
-.legislation-content .LegP1GroupTitle {
-  @apply text-iron-grey font-bold mt-6 mb-3;
-  scroll-margin-top: 2rem; /* Space when scrolling to anchor */
+/* ========================================
+   SECTION NUMBERS - Bold, hanging indent
+   ======================================== */
+
+.legislation-provision .LegP1No,
+.legislation-provision .LegSectionNo,
+.legislation-provision .LegArticleRef {
+  @apply font-bold text-iron-grey;
+  font-size: 18px;
+  display: inline-block;
+  min-width: 3rem;
+  margin-right: 1rem;
 }
 
-.legislation-content h1 {
-  @apply text-2xl;
+/* ========================================
+   HEADINGS - Clear hierarchy
+   ======================================== */
+
+.legislation-provision h1,
+.legislation-provision .LegP1GroupTitle {
+  @apply text-iron-grey font-bold;
+  font-size: 24px;
+  margin: 2rem 0 1.5rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid theme('colors.cool-steel');
 }
 
-.legislation-content h2,
-.legislation-content .LegP1GroupTitle {
-  @apply text-xl;
+.legislation-provision h2 {
+  @apply text-iron-grey font-bold;
+  font-size: 20px;
+  margin: 1.5rem 0 1rem 0;
 }
 
-.legislation-content h3 {
-  @apply text-lg;
+.legislation-provision h3 {
+  @apply text-iron-grey font-semibold;
+  font-size: 18px;
+  margin: 1rem 0 0.75rem 0;
 }
 
-/* Legislation-specific elements */
-.legislation-content .LegP1,
-.legislation-content .LegP2,
-.legislation-content .LegP3 {
-  @apply mb-4;
+.legislation-provision h4 {
+  @apply text-iron-grey font-semibold;
+  font-size: 16px;
+  margin: 0.75rem 0 0.5rem 0;
 }
 
-.legislation-content .LegP1Para,
-.legislation-content .LegP2Para,
-.legislation-content .LegP3Para {
-  @apply my-2;
+/* ========================================
+   PARAGRAPHS - Proper indentation
+   ======================================== */
+
+/* Level 1 - Main provisions */
+.legislation-provision .LegP1Container,
+.legislation-provision .LegP1 {
+  margin-bottom: 1.5rem;
+  padding-left: 0;
 }
 
-/* Section numbers */
-.legislation-content .LegArticleRef,
-.legislation-content .LegSectionNo {
-  @apply font-bold text-iron-grey mr-2;
+.legislation-provision .LegP1Para {
+  margin-bottom: 0.75rem;
+  padding-left: 4rem; /* Indent for hanging number */
+  text-indent: -4rem;
 }
 
-/* Links */
-.legislation-content a {
-  @apply text-cool-steel underline hover:text-iron-grey;
+/* Level 2 - Sub-provisions */
+.legislation-provision .LegP2Container,
+.legislation-provision .LegP2 {
+  margin-left: 2rem;
+  margin-bottom: 1rem;
+}
+
+.legislation-provision .LegP2Para {
+  margin-bottom: 0.5rem;
+  padding-left: 3rem;
+  text-indent: -3rem;
+}
+
+.legislation-provision .LegP2No {
+  @apply font-semibold text-iron-grey;
+  display: inline-block;
+  min-width: 2.5rem;
+  margin-right: 0.5rem;
+}
+
+/* Level 3 - Sub-sub-provisions */
+.legislation-provision .LegP3Container,
+.legislation-provision .LegP3 {
+  margin-left: 4rem;
+  margin-bottom: 0.75rem;
+}
+
+.legislation-provision .LegP3Para {
+  margin-bottom: 0.5rem;
+  padding-left: 2.5rem;
+  text-indent: -2.5rem;
+}
+
+.legislation-provision .LegP3No {
+  @apply font-medium text-iron-grey;
+  display: inline-block;
+  min-width: 2rem;
+  margin-right: 0.5rem;
+}
+
+/* Level 4 - Further sub-provisions */
+.legislation-provision .LegP4Container,
+.legislation-provision .LegP4 {
+  margin-left: 6rem;
+  margin-bottom: 0.5rem;
+}
+
+.legislation-provision .LegP4Para {
+  padding-left: 2rem;
+  text-indent: -2rem;
+}
+
+.legislation-provision .LegP4No {
+  @apply font-normal text-iron-grey;
+  display: inline-block;
+  min-width: 1.5rem;
+  margin-right: 0.5rem;
+}
+
+/* ========================================
+   TEXT FORMATTING
+   ======================================== */
+
+.legislation-provision p {
+  @apply text-iron-grey;
+  margin-bottom: 0.75rem;
+}
+
+.legislation-provision .LegText {
+  @apply text-iron-grey;
+}
+
+.legislation-provision strong,
+.legislation-provision b {
+  @apply font-semibold text-iron-grey;
+}
+
+.legislation-provision em,
+.legislation-provision i {
+  @apply italic;
+}
+
+/* ========================================
+   DEFINITIONS & REFERENCES
+   ======================================== */
+
+.legislation-provision .LegDefinition {
+  @apply font-semibold;
+  border-bottom: 1px dotted theme('colors.cool-steel');
+}
+
+.legislation-provision .LegCrossRef,
+.legislation-provision a {
+  @apply text-cool-steel underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
-.legislation-content p {
-  @apply text-iron-grey/90 mb-4;
+.legislation-provision .LegCrossRef:hover,
+.legislation-provision a:hover {
+  @apply text-iron-grey;
 }
 
-.legislation-content strong,
-.legislation-content b {
-  @apply text-iron-grey font-semibold;
+/* ========================================
+   LISTS
+   ======================================== */
+
+.legislation-provision ul {
+  list-style-type: disc;
+  margin-left: 2rem;
+  margin-bottom: 1rem;
 }
 
-.legislation-content ul,
-.legislation-content ol {
-  @apply text-iron-grey/90 my-4 pl-6;
+.legislation-provision ol {
+  list-style-type: decimal;
+  margin-left: 2rem;
+  margin-bottom: 1rem;
 }
 
-.legislation-content li {
-  @apply mb-2;
+.legislation-provision li {
+  margin-bottom: 0.5rem;
+  padding-left: 0.5rem;
 }
 
-/* Tables */
-.legislation-content table {
-  @apply w-full border-collapse my-4;
+/* ========================================
+   TABLES
+   ======================================== */
+
+.legislation-provision table {
+  @apply w-full border-collapse;
+  margin: 1.5rem 0;
+  border: 2px solid theme('colors.dim-grey');
 }
 
-.legislation-content th {
-  @apply bg-khaki-beige text-iron-grey font-semibold p-3 border border-dim-grey/30 text-left;
+.legislation-provision th {
+  @apply bg-khaki-beige text-iron-grey font-bold;
+  padding: 0.75rem;
+  border: 1px solid theme('colors.dim-grey');
+  text-align: left;
 }
 
-.legislation-content td {
-  @apply p-3 border border-dim-grey/30;
+.legislation-provision td {
+  padding: 0.75rem;
+  border: 1px solid theme('colors.dim-grey');
 }
 
-.legislation-content blockquote {
-  @apply border-l-4 border-cool-steel pl-4 my-4 italic text-dim-grey;
+.legislation-provision tbody tr:nth-child(even) {
+  @apply bg-sand-dune/30;
 }
 
-/* Indentation for nested provisions */
-.legislation-content .LegLevel1 {
-  @apply pl-0;
+/* ========================================
+   SCHEDULES & APPENDICES
+   ======================================== */
+
+.legislation-provision .LegSchedule {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 3px solid theme('colors.cool-steel');
 }
 
-.legislation-content .LegLevel2 {
-  @apply pl-6;
+.legislation-provision .LegScheduleTitle {
+  @apply font-bold text-iron-grey;
+  font-size: 22px;
+  margin-bottom: 1.5rem;
 }
 
-.legislation-content .LegLevel3 {
-  @apply pl-12;
+/* ========================================
+   MARGINAL NOTES & ANNOTATIONS
+   ======================================== */
+
+.legislation-provision .LegMarginalNote {
+  @apply text-cool-steel italic;
+  font-size: 14px;
+  margin-bottom: 0.5rem;
 }
 
-/* Definitions and cross-references */
-.legislation-content .LegDefinition {
-  @apply font-semibold;
+/* ========================================
+   QUOTES & CITATIONS
+   ======================================== */
+
+.legislation-provision blockquote {
+  @apply border-l-4 border-cool-steel;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: theme('colors.dim-grey');
 }
 
-.legislation-content .LegCrossRef {
-  @apply text-cool-steel;
+/* ========================================
+   AMENDMENTS & MODIFICATIONS
+   ======================================== */
+
+.legislation-provision .LegAmendment {
+  @apply bg-cool-steel/10;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-left: 4px solid theme('colors.cool-steel');
+  border-radius: 4px;
 }
 
-/* Scrollbar styling - thinner for better performance */
+.legislation-provision .LegInserted {
+  @apply bg-green-100;
+  border-bottom: 2px solid theme('colors.green-600');
+}
+
+.legislation-provision .LegRepealed {
+  @apply line-through text-dim-grey/60;
+}
+
+/* ========================================
+   PERFORMANCE OPTIMIZATIONS
+   ======================================== */
+
+.legislation-provision {
+  transform: translateZ(0);
+  will-change: scroll-position;
+  contain: layout style;
+}
+
+/* ========================================
+   SCROLLBAR
+   ======================================== */
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -164,31 +337,27 @@
   @apply bg-iron-grey;
 }
 
-/* Selection */
+/* ========================================
+   SELECTION
+   ======================================== */
+
 ::selection {
   @apply bg-cool-steel/40 text-iron-grey;
 }
 
-/* Focus outline */
+/* ========================================
+   FOCUS
+   ======================================== */
+
 *:focus-visible {
   outline: 2px solid theme('colors.cool-steel');
   outline-offset: 2px;
 }
 
-/* Smooth scroll behavior */
+/* ========================================
+   SMOOTH SCROLLING
+   ======================================== */
+
 html {
   scroll-behavior: smooth;
-}
-
-/* Loading optimization - prevent flash of unstyled content */
-.legislation-content img {
-  max-width: 100%;
-  height: auto;
-  loading: lazy;
-}
-
-/* Reduce repaints during scroll */
-.legislation-content * {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
