@@ -25,7 +25,6 @@
 
 /* ========================================
    CLML XML ELEMENT STYLING
-   CRITICAL: All inline elements to prevent line breaks
    ======================================== */
 
 .legislation-provision {
@@ -35,11 +34,72 @@
   line-height: 1.9;
 }
 
-/* Substitution */
+/* Part and Chapter - CENTERED */
+.legislation-provision Part,
+.legislation-provision Chapter {
+  display: block;
+  text-align: center;
+  margin: 3rem 0 2rem 0;
+  page-break-before: always;
+}
+
+.legislation-provision Part > Number,
+.legislation-provision Chapter > Number {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 28px;
+  margin-bottom: 0.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.legislation-provision Part > Title,
+.legislation-provision Chapter > Title {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+}
+
+/* Substitution, Addition, Repeal - inline with styling */
 .legislation-provision Substitution {
   display: inline;
   font-style: italic;
   color: #1e293b;
+}
+
+.legislation-provision Addition {
+  display: inline;
+  color: #059669;
+  background: #d1fae5;
+  padding: 0 0.25rem;
+  border-radius: 2px;
+}
+
+.legislation-provision Repeal {
+  display: inline;
+  text-decoration: line-through;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 0 0.25rem;
+  border-radius: 2px;
+}
+
+/* Abbreviation - dotted underline with title */
+.legislation-provision Abbreviation {
+  display: inline;
+  border-bottom: 1px dotted #66635b;
+  cursor: help;
+}
+
+/* Emphasis - italic */
+.legislation-provision Emphasis {
+  display: inline;
+  font-style: italic;
 }
 
 /* Internal Links */
@@ -69,7 +129,7 @@
   opacity: 0.8;
 }
 
-/* P1, P2, P3, P4 - Block containers only */
+/* P1, P2, P3, P4 - Block containers */
 .legislation-provision P1 {
   display: block;
   margin-bottom: 1.5rem;
@@ -97,7 +157,7 @@
   margin-bottom: 0.75rem;
 }
 
-/* Pnumber - INLINE with number */
+/* Pnumber - INLINE with brackets preserved */
 .legislation-provision Pnumber {
   display: inline;
   font-weight: 700;
@@ -124,8 +184,8 @@
   margin-bottom: 2rem;
 }
 
-/* Title */
-.legislation-provision Title {
+/* Title (for sections) */
+.legislation-provision P1group > Title {
   display: block;
   font-weight: 700;
   color: #0f172a;
@@ -184,11 +244,6 @@
 }
 
 /* Text formatting - ALL INLINE */
-.legislation-provision Emphasis {
-  display: inline;
-  font-style: italic;
-}
-
 .legislation-provision Strong {
   display: inline;
   font-weight: 600;
@@ -212,16 +267,11 @@
   font-size: 0.75em;
 }
 
-/* Commentary refs */
+/* Commentary refs - removed as they go in accordions now */
 .legislation-provision CommentaryRef,
 .legislation-provision FootnoteRef,
 .legislation-provision MarginNoteRef {
-  display: inline;
-  color: #cd7f32;
-  font-size: 0.85em;
-  vertical-align: super;
-  cursor: help;
-  text-decoration: none;
+  display: none;
 }
 
 /* Quotations */
@@ -403,6 +453,54 @@
 .legislation-provision li {
   margin-bottom: 0.75rem;
   color: #1e293b;
+}
+
+/* Amendments and Commencement Accordions */
+.amendments-accordion {
+  margin-top: 2rem;
+  border-top: 2px solid #d7ceb2;
+  padding-top: 1rem;
+}
+
+.accordion-button {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #d7ceb2;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #4c5760;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.accordion-button:hover {
+  background: #e9ecef;
+  border-color: #cd7f32;
+  color: #cd7f32;
+}
+
+.accordion-button.active {
+  background: #cd7f32;
+  color: white;
+  border-color: #cd7f32;
+}
+
+.accordion-content {
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #d7ceb2;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.7;
 }
 
 /* Scrollbar */
