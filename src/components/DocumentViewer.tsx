@@ -161,14 +161,36 @@ export function DocumentViewer({
         const effectsUrl = `${baseUrl}/effects/data.xml`;
         const response = await fetch(`/api/legislation?url=${encodeURIComponent(effectsUrl)}`);
         
-        if (response.ok) {
-          const xmlText = await response.text();
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-          
-          const relationships = parseRelationships(xmlDoc, baseUrl);
-          setRelationshipsData(relationships);
-        }
+        const response = await fetch(`/api/legislation?url=${encodeURIComponent(effectsUrl)}`);
+
+console.log('Effects URL:', effectsUrl);
+console.log('Response status:', response.status);
+
+if (response.ok) {
+  const xmlText = await response.text();
+  console.log('Effects XML length:', xmlText.length);
+  console.log('First 500 chars:', xmlText.substring(0, 500));
+  
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+  
+  const relationships = parseRelationships(xmlDoc, baseUrl);
+  console.log('Parsed relationships:', relationships);
+  setRelationshipsData(relationships);
+} else {
+  console.log('Failed to fetch effects, trying /changes endpoint');
+  // Try alternative endpoint
+  const changesUrl = `${baseUrl}/changes/data.xml`;
+  const changesResponse = await fetch(`/api/legislation?url=${encodeURIComponent(changesUrl)}`);
+  
+  if (changesResponse.ok) {
+    const xmlText = await changesResponse.text();
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+    const relationships = parseRelationships(xmlDoc, baseUrl);
+    setRelationshipsData(relationships);
+  }
+}
       } catch (error) {
         console.error('Error fetching relationships:', error);
         setRelationshipsData(null);
