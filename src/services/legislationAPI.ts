@@ -94,8 +94,8 @@ export const legislationAPI = {
           url = `${LEGISLATION_BASE}${url}`;
         }
         
-        // Remove /contents and any date/version from the URL
-        url = url.replace('/contents', '').split('/enacted')[0].split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
+        // Clean URL - remove /contents and dates
+        url = url.replace('/contents', '').split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
         
         results.push({
           title,
@@ -115,113 +115,135 @@ export const legislationAPI = {
     }
 
     try {
-      console.log('Original URL:', url);
+      console.log('🔍 Fetching document:', url);
       
-      // Clean URL to base legislation ID
+      // Clean URL to base
       let baseUrl = url
         .replace('/contents', '')
         .replace('/data.htm', '')
         .replace('/data.html', '');
       
-      // Remove any date/version paths like /2026-01-19 or /enacted
+      // Remove dates/versions
       baseUrl = baseUrl.split('/enacted')[0].split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
       
-      console.log('Base URL:', baseUrl);
+      console.log('🧹 Cleaned base URL:', baseUrl);
       
-      // Try multiple strategies to get content
-      const strategies = [
-        baseUrl,                           // Base URL (e.g., /ukpga/2006/46)
-        `${baseUrl}/contents`,             // Contents page
-        `${baseUrl}/section/1`,            // First section
-        `${baseUrl}/enacted`,              // Enacted version
-        `${baseUrl}/enacted/contents`,     // Enacted contents
+      // ALWAYS try /enacted first - this bypasses version selection
+      const enactedUrl = `${baseUrl}/enacted`;
+      console.log('📜 Trying enacted version:', enactedUrl);
+      
+      const proxyUrl = `/api/legislation?url=${encodeURIComponent(enactedUrl)}`;
+      const response = await fetch(proxyUrl);
+      
+      console.log('📡 Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const html = await response.text();
+      console.log('📄 HTML received, length:', html.length);
+      
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Check the body text
+      const bodyText = doc.body.textContent || '';
+      console.log('📝 Body text preview:', bodyText.substring(0, 200));
+      
+      // More aggressive version selection detection
+      const isVersionPage = 
+        bodyText.includes('Latest available') ||
+        bodyText.includes('Point in Time') ||
+        bodyText.includes('Original (As enacted)') ||
+        bodyText.includes('More Resources') && html.length < 20000;
+      
+      if (isVersionPage) {
+        console.log('⚠️ Still got version selection page!');
+        console.log('📋 Full body text:', bodyText);
+        
+        // Return error message
+        return `
+          <div style="padding: 30px; background: #fff3cd; border: 3px solid #ffc107; border-radius: 10px; margin: 20px;">
+            <h2 style="color: #856404; margin-top: 0;">⚠️ Version Selection Page Detected</h2>
+            <p style="color: #856404; font-size: 16px;">The legislation.gov.uk website returned a version selection page instead of the document content.</p>
+            <p style="color: #856404;"><strong>Tried URL:</strong> <code>${enactedUrl}</code></p>
+            <p style="margin: 20px 0;">
+              <a href="${enactedUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Open Directly on legislation.gov.uk →
+              </a>
+            </p>
+            <details style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #ddd; border-radius: 5px;">
+              <summary style="cursor: pointer; font-weight: bold; color: #666;">Debug Information</summary>
+              <pre style="font-size: 12px; overflow: auto; margin-top: 10px;">${bodyText.substring(0, 1000)}</pre>
+            </details>
+          </div>
+        `;
+      }
+      
+      // Try to find content
+      const selectors = [
+        '#viewLegContents',
+        '#content',
+        '.LegContent', 
+        '#legislation',
+        'article',
+        'main'
       ];
       
-      for (const tryUrl of strategies) {
-        console.log('Trying:', tryUrl);
-        
-        const proxyUrl = `/api/legislation?url=${encodeURIComponent(tryUrl)}`;
-        const response = await fetch(proxyUrl);
-        
-        if (!response.ok) {
-          console.log('Failed:', response.status);
-          continue;
-        }
-
-        const html = await response.text();
-        console.log('Response length:', html.length);
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Check if this is a version selection page
-        const pageText = doc.body.textContent || '';
-        if (pageText.includes('Latest available (Revised)') && 
-            pageText.includes('Point in Time') && 
-            pageText.includes('Original (As enacted)') &&
-            html.length < 10000) {
-          console.log('Version selection page, trying next strategy');
-          continue;
-        }
-        
-        // Try multiple content selectors
-        const selectors = [
-          '#viewLegContents',
-          '#content',
-          '.LegContent',
-          'article',
-          'main'
-        ];
-        
-        let content = null;
-        for (const selector of selectors) {
-          content = doc.querySelector(selector);
-          if (content && content.textContent && content.textContent.length > 500) {
-            console.log('Found content with:', selector);
-            break;
-          }
-        }
-        
-        if (!content) {
-          console.log('No content found with selectors, trying body');
-          content = doc.body;
-        }
-        
-        if (content) {
-          // Remove unwanted elements
-          const unwanted = content.querySelectorAll(
-            'script, style, nav, header, footer, .navigation, .breadcrumb, ' +
-            '.toolTip, .LegNavigation, .printOptions, .moreResources, ' +
-            '.accessKey, #layout1, .LegNav'
-          );
-          unwanted.forEach(el => el.remove());
-          
-          const finalHtml = content.innerHTML;
-          
-          // Verify we got actual content
-          if (finalHtml.length > 500 && 
-              !finalHtml.includes('Latest available (Revised)') && 
-              !finalHtml.includes('Point in Time')) {
-            console.log('Success! Content length:', finalHtml.length);
-            return finalHtml;
-          }
+      let content = null;
+      let usedSelector = '';
+      
+      for (const selector of selectors) {
+        const el = doc.querySelector(selector);
+        if (el && el.textContent && el.textContent.length > 500) {
+          content = el;
+          usedSelector = selector;
+          console.log('✅ Found content with selector:', selector);
+          break;
         }
       }
       
-      // All strategies failed
-      console.error('All strategies failed to get content');
-      return `
-        <div style="padding: 20px; background: #f0e68c; border: 2px solid #daa520; border-radius: 8px;">
-          <h2>Unable to Load Document</h2>
-          <p>The legislation content could not be retrieved from <a href="${url}" target="_blank">${url}</a></p>
-          <p>Please click the link above to view it directly on legislation.gov.uk</p>
-          <p style="font-size: 0.9em; color: #666;">This may be because the document requires selecting a specific version or has restricted access.</p>
-        </div>
-      `;
+      if (!content) {
+        console.log('❌ No content selector worked, using body');
+        content = doc.body;
+        usedSelector = 'body';
+      }
+      
+      // Remove unwanted elements
+      const unwanted = content.querySelectorAll(
+        'script, style, nav, header, footer, .navigation, .breadcrumb, ' +
+        '.toolTip, .LegNavigation, .printOptions, .moreResources, ' +
+        '.accessKey, #layout1, .LegNav, .LegBreadcrumb'
+      );
+      
+      console.log('🗑️ Removing', unwanted.length, 'unwanted elements');
+      unwanted.forEach(el => el.remove());
+      
+      const finalHtml = content.innerHTML;
+      console.log('✨ Final content length:', finalHtml.length);
+      
+      // Validate we have real content
+      if (finalHtml.length < 500) {
+        throw new Error('Content too short');
+      }
+      
+      return finalHtml;
       
     } catch (error) {
-      console.error('Error fetching legislation document:', error);
-      throw error;
+      console.error('❌ Error fetching document:', error);
+      return `
+        <div style="padding: 30px; background: #f8d7da; border: 3px solid #dc3545; border-radius: 10px; margin: 20px;">
+          <h2 style="color: #721c24; margin-top: 0;">❌ Failed to Load Document</h2>
+          <p style="color: #721c24; font-size: 16px;">Error: ${error instanceof Error ? error.message : 'Unknown error'}</p>
+          <p style="color: #721c24;"><strong>Attempted URL:</strong> <code>${url}</code></p>
+          <p style="margin: 20px 0;">
+            <a href="${url}" target="_blank" style="display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              Open Directly on legislation.gov.uk →
+            </a>
+          </p>
+        </div>
+      `;
     }
   },
 
@@ -277,7 +299,7 @@ export const legislationAPI = {
       {
         title: 'Equality Act 2010',
         url: `${LEGISLATION_BASE}/ukpga/2010/15`,
-        snippet: 'An Act to make provision to require Ministers of the Crown and others when making strategic decisions...',
+        snippet: 'An Act to make provision to require Ministers of the Crown and others...',
         source: 'legislation' as const,
       },
     ].filter(result => 
