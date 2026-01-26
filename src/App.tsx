@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search } from './components/Search';
 import { Sidebar } from './components/Sidebar';
 import { DocumentViewer } from './components/DocumentViewer';
-import type { AppState, Document, Folder, SearchResult, Highlight, Comment } from './types';
+import type { AppState, Document, Folder, SearchResult, Comment } from './types';
 import { storage } from './services/storage';
 import { legislationAPI } from './services/legislationAPI';
 
@@ -90,11 +90,6 @@ function App() {
     }
   };
 
-  const handleAddHighlight = (documentId: string, highlight: Highlight) => {
-    const newState = storage.addHighlight(state, documentId, highlight);
-    setState(newState);
-  };
-
   const handleAddComment = (documentId: string, comment: Comment) => {
     const newState = storage.addComment(state, documentId, comment);
     setState(newState);
@@ -102,7 +97,7 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-sand-dune">
-      {/* Header with subtle shadow */}
+      {/* Header */}
       <header className="bg-iron-grey shadow-md px-6 py-4 border-b-2 border-dim-grey">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -110,13 +105,13 @@ function App() {
               <span className="text-iron-grey font-bold text-xl">§</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-sand-dune tracking-tight">Legal Research</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">Legal Research</h1>
               <p className="text-xs text-cool-steel">UK Legislation Database</p>
             </div>
           </div>
           <button
             onClick={() => setShowSearch(!showSearch)}
-            className="px-4 py-2 bg-cool-steel text-iron-grey font-medium rounded-lg hover:bg-khaki-beige transition-all text-sm shadow-sm hover:shadow"
+            className="px-4 py-2 bg-white text-iron-grey font-semibold rounded-lg hover:bg-cool-steel hover:text-white transition-all text-sm shadow-sm hover:shadow"
           >
             {showSearch ? 'Hide Search' : 'Show Search'}
           </button>
@@ -151,7 +146,6 @@ function App() {
             onToggleFavorite={handleToggleFavorite}
             onMoveToFolder={handleMoveDocument}
             onDelete={handleDeleteDocument}
-            onAddHighlight={handleAddHighlight}
             onAddComment={handleAddComment}
           />
         </div>
