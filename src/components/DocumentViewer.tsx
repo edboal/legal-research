@@ -180,22 +180,25 @@ export function DocumentViewer({
           const changesUrl = `${baseUrl}/changes/data.xml`;
           const changesResponse = await fetch(`/api/legislation?url=${encodeURIComponent(changesUrl)}`);
           
-          if (changesResponse.ok) {
-            const xmlText = await changesResponse.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-            const relationships = parseRelationships(xmlDoc, baseUrl);
-            setRelationshipsData(relationships);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching relationships:', error);
-        setRelationshipsData(null);
-      } finally {
-        setLoadingRelationships(false);
-      }
-    };
-    
+if (changesResponse.ok) {
+  const xmlText = await changesResponse.text();
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+  const relationships = parseRelationships(xmlDoc, baseUrl);
+  setRelationshipsData(relationships);
+} else {
+  // Both endpoints failed - set empty but valid data to show helpful message
+  console.log('No effects or changes data available for this legislation');
+  setRelationshipsData({ 
+    nodes: [{ 
+      id: baseUrl, 
+      name: document?.title || 'Current Legislation', 
+      type: 'current', 
+      url: baseUrl 
+    }], 
+    links: [] 
+  });
+}
     fetchRelationships();
   }, [document?.id]);
 
