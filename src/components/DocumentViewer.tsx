@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, ChevronLeft, ChevronRight, FileText, List, BookOpen, ArrowUp, Loader } from 'lucide-react';
-import type { Document, Folder, Highlight, Comment } from '../types';
+import type { Document, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
   document: Document | null;
