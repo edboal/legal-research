@@ -314,7 +314,32 @@ export function DocumentViewer({
 
   const parseTOCFromXML = (xmlDoc: XMLDocument): TOCItem[] => {
     const items: TOCItem[] = [];
-    const contentsParts = xmlDoc.querySelectorAll('ContentsPart, ContentsSchedule');
+    
+    // First, get top-level sections (before any Parts/Schedules)
+    const topLevelSections = xmlDoc.querySelectorAll('Contents > ContentsItem');
+    
+    topLevelSections.forEach((item: Element, index: number) => {
+      const numberEl = item.querySelector('ContentsNumber');
+      const titleEl = item.querySelector('ContentsTitle');
+      const contentRef = item.getAttribute('ContentRef') || `section-${index}`;
+      const documentURI = item.getAttribute('DocumentURI') || '';
+      
+      let number = numberEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+      let title = titleEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+      
+      items.push({
+        id: contentRef,
+        number,
+        title,
+        url: documentURI,
+        status: item.getAttribute('Status') || undefined,
+        children: [],
+        level: 0
+      });
+    });
+    
+    // Then get Parts with their nested sections
+    const contentsParts = xmlDoc.querySelectorAll('ContentsPart');
     
     contentsParts.forEach((part: Element, index: number) => {
       const numberEl = part.querySelector('ContentsNumber');
@@ -360,29 +385,52 @@ export function DocumentViewer({
       items.push(partItem);
     });
     
-    if (items.length === 0) {
-      const topLevelItems = xmlDoc.querySelectorAll('Contents > ContentsItem, TableOfContents > ContentsItem');
+    // Finally get Schedules
+    const contentsSchedules = xmlDoc.querySelectorAll('ContentsSchedule');
+    
+    contentsSchedules.forEach((schedule: Element, index: number) => {
+      const numberEl = schedule.querySelector('ContentsNumber');
+      const titleEl = schedule.querySelector('ContentsTitle');
+      const contentRef = schedule.getAttribute('ContentRef') || `schedule-${index}`;
+      const documentURI = schedule.getAttribute('DocumentURI') || '';
       
-      topLevelItems.forEach((item: Element, index: number) => {
-        const numberEl = item.querySelector('ContentsNumber');
-        const titleEl = item.querySelector('ContentsTitle');
-        const contentRef = item.getAttribute('ContentRef') || `section-${index}`;
-        const documentURI = item.getAttribute('DocumentURI') || '';
+      let number = numberEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+      let title = titleEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+      
+      const scheduleItem: TOCItem = {
+        id: contentRef,
+        number,
+        title,
+        url: documentURI,
+        status: schedule.getAttribute('Status') || undefined,
+        children: [],
+        level: 0
+      };
+      
+      const contentsItems = schedule.querySelectorAll(':scope > ContentsItem, :scope > ContentsPblock > ContentsItem');
+      
+      contentsItems.forEach((item: Element, itemIndex: number) => {
+        const itemNumberEl = item.querySelector('ContentsNumber');
+        const itemTitleEl = item.querySelector('ContentsTitle');
+        const itemContentRef = item.getAttribute('ContentRef') || `item-schedule-${index}-${itemIndex}`;
+        const itemDocumentURI = item.getAttribute('DocumentURI') || '';
         
-        let number = numberEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
-        let title = titleEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+        let itemNumber = itemNumberEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
+        let itemTitle = itemTitleEl?.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
         
-        items.push({
-          id: contentRef,
-          number,
-          title,
-          url: documentURI,
+        scheduleItem.children.push({
+          id: itemContentRef,
+          number: itemNumber,
+          title: itemTitle,
+          url: itemDocumentURI,
           status: item.getAttribute('Status') || undefined,
           children: [],
-          level: 0
+          level: 1
         });
       });
-    }
+      
+      items.push(scheduleItem);
+    });
     
     return items;
   };
