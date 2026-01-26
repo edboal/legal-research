@@ -10,9 +10,8 @@ export default {
         'iron-grey': '#4c5760',
         'cool-steel': '#93a8ac',
         'sand-dune': '#d7ceb2',
-        'khaki-beige': '#a59e8c',
         'dim-grey': '#66635b',
-        // Additional colors for better contrast
+        // Better contrast colors
         'slate': {
           800: '#1e293b',
           900: '#0f172a',
