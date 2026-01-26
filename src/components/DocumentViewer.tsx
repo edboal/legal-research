@@ -3,7 +3,7 @@ import { Star, FolderInput, Trash2, MessageSquare, ExternalLink,
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
-         StickyNote } from 'lucide-react';
+         StickyNote, X } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -46,6 +46,8 @@ const HIGHLIGHT_COLORS = [
   { name: 'Pink', color: '#fbcfe8', border: '#f9a8d4' },
 ];
 
+type RightPanelTab = 'notes' | 'comments' | 'highlights' | null;
+
 export function DocumentViewer({
   document,
   folders,
@@ -55,8 +57,7 @@ export function DocumentViewer({
   onAddComment,
 }: DocumentViewerProps) {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>(null);
   const [newComment, setNewComment] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [notesSearchQuery, setNotesSearchQuery] = useState('');
@@ -114,7 +115,6 @@ export function DocumentViewer({
     return flatten(tableOfContents);
   }, [tableOfContents]);
 
-  // Fetch Table of Contents and status
   useEffect(() => {
     if (!document) return;
 
@@ -124,8 +124,6 @@ export function DocumentViewer({
         const baseUrl = document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '');
         const tocUrl = `${baseUrl}/contents/data.xml`;
         
-        console.log('Fetching TOC from:', tocUrl);
-        
         const response = await fetch(`/api/legislation?url=${encodeURIComponent(tocUrl)}`);
         if (!response.ok) throw new Error('Failed to fetch TOC');
         
@@ -133,7 +131,6 @@ export function DocumentViewer({
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         
-        // Extract status from metadata
         const metadata = xmlDoc.querySelector('Metadata');
         const status = extractStatusFromMetadata(metadata);
         setDocumentStatus(status);
@@ -163,14 +160,9 @@ export function DocumentViewer({
       };
     }
 
-    // Check for version info
     const enacted = metadata.querySelector('EnactmentDate, Made');
     const modified = metadata.querySelector('Modified');
-    
-    // Check if it's an enacted version
     const isEnacted = document?.url.toLowerCase().includes('/enacted');
-    
-    // Check for modifications/amendments
     const hasModifications = metadata.querySelector('UnappliedEffects Effect');
     
     if (isEnacted) {
@@ -206,7 +198,6 @@ export function DocumentViewer({
 
   const parseTOCFromXML = (xmlDoc: XMLDocument): TOCItem[] => {
     const items: TOCItem[] = [];
-    
     const contentsParts = xmlDoc.querySelectorAll('ContentsPart, ContentsSchedule');
     
     contentsParts.forEach((part: Element, index: number) => {
@@ -317,12 +308,9 @@ export function DocumentViewer({
     }
     
     try {
-      if (!item.url) {
-        throw new Error('No URL available');
-      }
+      if (!item.url) throw new Error('No URL available');
       
       const xmlUrl = item.url.includes('/data.xml') ? item.url : `${item.url}/data.xml`;
-      console.log('Fetching provision:', xmlUrl);
       
       const response = await fetch(`/api/legislation?url=${encodeURIComponent(xmlUrl)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -333,11 +321,8 @@ export function DocumentViewer({
       
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
-        // Process the XML to handle links and clean up
         const processedContent = processProvisionXML(body);
         setProvisionContent(processedContent);
-        
-        // Extract notes
         extractNotes(xmlDoc, item);
       } else {
         setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
@@ -360,14 +345,12 @@ export function DocumentViewer({
   const processProvisionXML = (body: Element): string => {
     const clone = body.cloneNode(true) as Element;
     
-    // Remove XML attributes that shouldn't be displayed
     const elementsWithAttrs = clone.querySelectorAll('[ChangeId], [CommentaryRef]');
     elementsWithAttrs.forEach(el => {
       el.removeAttribute('ChangeId');
       el.removeAttribute('CommentaryRef');
     });
     
-    // Process internal references to make them clickable
     const references = clone.querySelectorAll('Reference, InternalLink, Citation');
     references.forEach((ref: Element) => {
       const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
@@ -390,7 +373,6 @@ export function DocumentViewer({
   };
 
   const handleInternalLink = (href: string) => {
-    // Extract section reference and try to find it in TOC
     const sectionMatch = href.match(/section-(\d+)|article-(\d+)|regulation-(\d+)/i);
     if (sectionMatch) {
       const sectionNum = sectionMatch[1] || sectionMatch[2] || sectionMatch[3];
@@ -409,10 +391,7 @@ export function DocumentViewer({
     const noteItems: NoteItem[] = [];
     
     notes.forEach((note: Element, idx: number) => {
-      const noteText = note.textContent || '';
       const noteRef = note.getAttribute('Ref') || '';
-      
-      // Find the actual note content
       const commentary = xmlDoc.querySelector(`Commentary[id="${noteRef}"]`);
       const footnote = xmlDoc.querySelector(`Footnote[id="${noteRef}"]`);
       const actualNote = commentary || footnote;
@@ -422,14 +401,13 @@ export function DocumentViewer({
           id: `note-${provision.id}-${idx}`,
           provisionId: provision.id,
           provisionTitle: `${provision.number} ${provision.title}`,
-          text: actualNote.textContent || noteText
+          text: actualNote.textContent || ''
         });
       }
     });
     
     if (noteItems.length > 0) {
       setAllNotes(prev => {
-        // Remove old notes for this provision
         const filtered = prev.filter(n => n.provisionId !== provision.id);
         return [...filtered, ...noteItems];
       });
@@ -620,6 +598,7 @@ export function DocumentViewer({
         <ArrowUp size={24} />
       </button>
 
+      {/* Header */}
       <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
@@ -654,6 +633,7 @@ export function DocumentViewer({
             </div>
           </div>
 
+          {/* Simplified Actions */}
           <div className="flex gap-1.5 flex-shrink-0">
             <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`} title="Toggle favorite">
               <Star size={18} fill={document.isFavorite ? 'currentColor' : 'none'} />
@@ -704,28 +684,6 @@ export function DocumentViewer({
               )}
             </div>
 
-            <button 
-              onClick={() => setShowNotes(!showNotes)} 
-              className={`p-2 rounded-lg transition-all relative ${showNotes ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`}
-              title="Toggle notes"
-            >
-              <StickyNote size={18} />
-              {allNotes.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {allNotes.length}
-                </span>
-              )}
-            </button>
-
-            <button onClick={() => setShowComments(!showComments)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative" title="Toggle comments">
-              <MessageSquare size={18} />
-              {document.comments.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {document.comments.length}
-                </span>
-              )}
-            </button>
-
             <button onClick={() => onDelete(document.id)} className="p-2 bg-dim-grey text-white hover:bg-red-600 rounded-lg transition-all" title="Delete document">
               <Trash2 size={18} />
             </button>
@@ -734,6 +692,7 @@ export function DocumentViewer({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
+        {/* TOC Panel */}
         {!tocCollapsed && (
           <div 
             className="border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden relative"
@@ -798,6 +757,7 @@ export function DocumentViewer({
           </div>
         )}
 
+        {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedProvision && (
             <div className="bg-sand-dune border-b-2 border-dim-grey px-6 py-3 flex items-center justify-between flex-shrink-0">
@@ -877,77 +837,141 @@ export function DocumentViewer({
           </div>
         </div>
 
-        {showNotes && (
-          <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
-            <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
-              <h2 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                <StickyNote size={18} />
-                Notes & Commentary ({allNotes.length})
-              </h2>
-              
-              <div className="relative">
-                <input 
-                  type="text" 
-                  value={notesSearchQuery} 
-                  onChange={(e) => setNotesSearchQuery(e.target.value)} 
-                  placeholder="Search notes..." 
-                  className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
-                />
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
+        {/* Right Panel with Tabs */}
+        {rightPanelTab !== null && (
+          <div className="w-80 border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
+            {/* Tab Header */}
+            <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
+              <div className="flex items-center border-b border-dim-grey/30">
+                <button
+                  onClick={() => setRightPanelTab('notes')}
+                  className={`flex-1 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+                    rightPanelTab === 'notes' ? 'bg-white text-iron-grey' : 'text-white hover:bg-dim-grey'
+                  }`}
+                >
+                  <StickyNote size={16} />
+                  Notes {allNotes.length > 0 && `(${allNotes.length})`}
+                </button>
+                <button
+                  onClick={() => setRightPanelTab('comments')}
+                  className={`flex-1 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+                    rightPanelTab === 'comments' ? 'bg-white text-iron-grey' : 'text-white hover:bg-dim-grey'
+                  }`}
+                >
+                  <MessageSquare size={16} />
+                  Comments {document.comments.length > 0 && `(${document.comments.length})`}
+                </button>
+                <button
+                  onClick={() => setRightPanelTab(null)}
+                  className="px-3 py-3 text-white hover:bg-dim-grey transition-colors"
+                  title="Close panel"
+                >
+                  <X size={16} />
+                </button>
               </div>
+
+              {/* Tab Content Header */}
+              {rightPanelTab === 'notes' && (
+                <div className="p-4">
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={notesSearchQuery} 
+                      onChange={(e) => setNotesSearchQuery(e.target.value)} 
+                      placeholder="Search notes..." 
+                      className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
+                    />
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
+                  </div>
+                </div>
+              )}
+
+              {rightPanelTab === 'comments' && (
+                <div className="p-4 space-y-2">
+                  <textarea 
+                    value={newComment} 
+                    onChange={(e) => setNewComment(e.target.value)} 
+                    placeholder="Add a comment..." 
+                    className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30" 
+                    rows={3} 
+                  />
+                  <button 
+                    onClick={handleAddComment} 
+                    disabled={!newComment.trim()} 
+                    className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50"
+                  >
+                    Add Comment
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {filteredNotes.length === 0 ? (
-                <div className="text-center text-dim-grey/60 py-8 italic text-sm">
-                  {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes in this provision'}
-                </div>
-              ) : (
-                filteredNotes.map(note => (
-                  <div key={note.id} className="p-3 bg-white rounded-lg border border-bronze/30 shadow-sm">
-                    <div className="text-xs font-semibold text-bronze mb-1">
-                      {note.provisionTitle}
-                    </div>
-                    <div className="text-sm text-iron-grey leading-relaxed">{note.text}</div>
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-sand-dune">
+              {rightPanelTab === 'notes' && (
+                filteredNotes.length === 0 ? (
+                  <div className="text-center text-dim-grey/60 py-8 italic text-sm">
+                    {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes in this provision'}
                   </div>
-                ))
+                ) : (
+                  filteredNotes.map(note => (
+                    <div key={note.id} className="p-3 bg-white rounded-lg border border-bronze/30 shadow-sm">
+                      <div className="text-xs font-semibold text-bronze mb-1">
+                        {note.provisionTitle}
+                      </div>
+                      <div className="text-sm text-iron-grey leading-relaxed">{note.text}</div>
+                    </div>
+                  ))
+                )
+              )}
+
+              {rightPanelTab === 'comments' && (
+                document.comments.length === 0 ? (
+                  <div className="text-center text-dim-grey/60 py-8 italic text-sm">
+                    No comments yet
+                  </div>
+                ) : (
+                  document.comments.map(comment => (
+                    <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
+                      <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
+                        {comment.timestamp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div className="text-sm text-iron-grey leading-relaxed">{comment.text}</div>
+                    </div>
+                  ))
+                )
               )}
             </div>
           </div>
         )}
 
-        {showComments && (
-          <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
-            <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
-              <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                <MessageSquare size={18} />
-                Comments ({document.comments.length})
-              </h2>
-              
-              <div className="space-y-2">
-                <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment..." className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30" rows={3} />
-                <button onClick={handleAddComment} disabled={!newComment.trim()} className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50">
-                  Add Comment
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {document.comments.length === 0 ? (
-                <div className="text-center text-dim-grey/60 py-8 italic text-sm">
-                  No comments yet
-                </div>
-              ) : (
-                document.comments.map(comment => (
-                  <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
-                    <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
-                      {comment.timestamp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    <div className="text-sm text-iron-grey leading-relaxed">{comment.text}</div>
-                  </div>
-                ))
+        {/* Tab Trigger Buttons (when panel closed) */}
+        {rightPanelTab === null && (
+          <div className="border-l-2 border-dim-grey bg-white p-2 flex flex-col gap-2">
+            <button
+              onClick={() => setRightPanelTab('notes')}
+              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
+              title="Notes"
+            >
+              <StickyNote size={20} className="text-iron-grey" />
+              {allNotes.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {allNotes.length}
+                </span>
               )}
-            </div>
+            </button>
+            <button
+              onClick={() => setRightPanelTab('comments')}
+              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
+              title="Comments"
+            >
+              <MessageSquare size={20} className="text-iron-grey" />
+              {document.comments.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {document.comments.length}
+                </span>
+              )}
+            </button>
           </div>
         )}
       </div>
