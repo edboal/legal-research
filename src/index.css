@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-shadow-grey;
+  }
+  
+  body {
+    @apply m-0 bg-shadow-grey text-cotton-rose;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Prose styling for document content */
+.prose {
+  @apply text-cotton-rose;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  @apply text-cotton-rose font-semibold;
+}
+
+.prose a {
+  @apply text-purple-x11 hover:text-petal-pink;
+}
+
+.prose p {
+  @apply text-cotton-rose/90;
+}
+
+.prose strong {
+  @apply text-cotton-rose font-semibold;
+}
+
+.prose ul,
+.prose ol {
+  @apply text-cotton-rose/90;
+}

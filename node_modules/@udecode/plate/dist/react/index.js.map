@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../src/react/index.tsx"],"sourcesContent":["export * from '@udecode/plate-core/react';\n\nexport * from '@udecode/plate-utils/react';\n\nexport * from '@udecode/react-hotkeys';\n\nexport * from '@udecode/react-utils';\n"],"mappings":";;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA,0BAAc,sCAAd;AAEA,0BAAc,uCAFd;AAIA,0BAAc,mCAJd;AAMA,0BAAc,iCANd;","names":[]}
