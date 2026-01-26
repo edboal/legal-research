@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader } from 'lucide-react';
-import type { Document, Folder, Comment } from '../types';
+import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
-  document: Document | null;
+  document: LegislationDocument | null;
   folders: Folder[];
   onToggleFavorite: (documentId: string) => void;
   onMoveToFolder: (documentId: string, folderId: string | null) => void;
@@ -81,12 +81,12 @@ export function DocumentViewer({
   }, [document?.id]);
 
   // Parse TOC from CLML XML
-  const parseTOCFromXML = (xmlDoc: Document): TOCItem[] => {
+  const parseTOCFromXML = (xmlDoc: XMLDocument): TOCItem[] => {
     const items: TOCItem[] = [];
     
     const contentsParts = xmlDoc.querySelectorAll('ContentsPart, ContentsSchedule');
     
-    contentsParts.forEach((part, index) => {
+    contentsParts.forEach((part: Element, index: number) => {
       const numberEl = part.querySelector('ContentsNumber');
       const titleEl = part.querySelector('ContentsTitle');
       const contentRef = part.getAttribute('ContentRef') || `part-${index}`;
@@ -107,7 +107,7 @@ export function DocumentViewer({
       
       const contentsItems = part.querySelectorAll(':scope > ContentsItem, :scope > ContentsPblock > ContentsItem');
       
-      contentsItems.forEach((item, itemIndex) => {
+      contentsItems.forEach((item: Element, itemIndex: number) => {
         const itemNumberEl = item.querySelector('ContentsNumber');
         const itemTitleEl = item.querySelector('ContentsTitle');
         const itemContentRef = item.getAttribute('ContentRef') || `item-${index}-${itemIndex}`;
@@ -133,7 +133,7 @@ export function DocumentViewer({
     if (items.length === 0) {
       const topLevelItems = xmlDoc.querySelectorAll('Contents > ContentsItem, TableOfContents > ContentsItem');
       
-      topLevelItems.forEach((item, index) => {
+      topLevelItems.forEach((item: Element, index: number) => {
         const numberEl = item.querySelector('ContentsNumber');
         const titleEl = item.querySelector('ContentsTitle');
         const contentRef = item.getAttribute('ContentRef') || `section-${index}`;
@@ -161,12 +161,12 @@ export function DocumentViewer({
     if (!document?.content) return;
     
     const parser = new DOMParser();
-    const doc = parser.parseFromString(document.content, 'text/html');
+    const htmlDoc = parser.parseFromString(document.content, 'text/html');
     const items: TOCItem[] = [];
     
-    const headings = doc.querySelectorAll('h1, h2, .LegP1GroupTitle, .LegHeading');
+    const headings = htmlDoc.querySelectorAll('h1, h2, .LegP1GroupTitle, .LegHeading');
     
-    headings.forEach((heading, index) => {
+    headings.forEach((heading: Element, index: number) => {
       let title = heading.textContent?.replace(/\[F\d+\]/g, '').trim() || '';
       
       items.push({
@@ -203,7 +203,7 @@ export function DocumentViewer({
       
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
-        const tempDiv = document.createElement('div');
+        const tempDiv = window.document.createElement('div');
         tempDiv.innerHTML = new XMLSerializer().serializeToString(body);
         setProvisionContent(tempDiv.innerHTML);
       } else {
@@ -298,7 +298,7 @@ export function DocumentViewer({
   };
 
   const handleAddComment = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !document) return;
     onAddComment(document.id, {
       id: crypto.randomUUID(),
       position: 0,
