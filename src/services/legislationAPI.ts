@@ -94,8 +94,8 @@ export const legislationAPI = {
           url = `${LEGISLATION_BASE}${url}`;
         }
         
-        // Clean URL - remove /contents and dates
-        url = url.replace('/contents', '').split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
+        // Only remove /contents, keep the full legislation ID
+        url = url.replace('/contents', '');
         
         results.push({
           title,
@@ -117,14 +117,11 @@ export const legislationAPI = {
     try {
       console.log('🔍 Fetching document:', url);
       
-      // Clean URL to base
+      // Clean URL - only remove /contents and /data extensions
       let baseUrl = url
         .replace('/contents', '')
         .replace('/data.htm', '')
         .replace('/data.html', '');
-      
-      // Remove dates/versions
-      baseUrl = baseUrl.split('/enacted')[0].split('/202')[0].split('/199')[0].split('/200')[0].split('/201')[0];
       
       console.log('🧹 Cleaned base URL:', baseUrl);
       
