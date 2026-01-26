@@ -23,26 +23,21 @@ export type LegislationType = keyof typeof LEGISLATION_TYPES;
 
 export interface LegislationSearchParams {
   title?: string;
-  type?: LegislationType | '*'; // * for all types
+  type?: LegislationType | '*';
   year?: number;
   number?: number;
   startYear?: number;
   endYear?: number;
-  resultsCount?: number; // Default is 20
+  resultsCount?: number;
 }
 
 export const legislationAPI = {
-  /**
-   * Search legislation using the Atom feed API
-   * @see https://www.legislation.gov.uk/developer/searching
-   */
   async search(params: LegislationSearchParams): Promise<SearchResult[]> {
     if (!USE_PROXY) {
       return this.getMockResults(params.title || '');
     }
 
     try {
-      // Build search query
       const queryParams = new URLSearchParams();
       
       if (params.title) queryParams.append('title', params.title);
@@ -53,7 +48,6 @@ export const legislationAPI = {
       if (params.endYear) queryParams.append('end-year', params.endYear.toString());
       if (params.resultsCount) queryParams.append('results-count', params.resultsCount.toString());
 
-      // Use Atom feed endpoint for search results
       const searchUrl = `${LEGISLATION_BASE}/all/data.feed?${queryParams.toString()}`;
       const proxyUrl = `/api/legislation?url=${encodeURIComponent(searchUrl)}`;
       
@@ -73,9 +67,6 @@ export const legislationAPI = {
     }
   },
 
-  /**
-   * Parse Atom feed XML to extract search results
-   */
   parseAtomFeed(xml: string): SearchResult[] {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'application/xml');
@@ -84,30 +75,28 @@ export const legislationAPI = {
     const entries = doc.querySelectorAll('entry');
     
     entries.forEach((entry) => {
-      // Get title
       const titleEl = entry.querySelector('title');
       const title = titleEl?.textContent?.trim() || '';
 
-      // Get link (use 'alternate' rel for HTML view)
       const linkEl = entry.querySelector('link[rel="alternate"][type="text/html"]');
       let url = linkEl?.getAttribute('href') || '';
 
-      // Get summary/snippet
       const summaryEl = entry.querySelector('summary');
       const snippet = summaryEl?.textContent?.trim() || '';
 
-      // Get updated date for display
       const updatedEl = entry.querySelector('updated');
       const updated = updatedEl?.textContent?.trim() || '';
 
       if (title && url) {
-        // Ensure URL starts with https://
         if (url.startsWith('http://')) {
           url = url.replace('http://', 'https://');
         }
         if (!url.startsWith('http')) {
           url = `${LEGISLATION_BASE}${url}`;
         }
+        
+        // Remove /contents from URL to get the main document
+        url = url.replace('/contents', '');
         
         results.push({
           title,
@@ -121,58 +110,93 @@ export const legislationAPI = {
     return results;
   },
 
-  /**
-   * Get document content as HTML
-   */
   async getDocument(url: string): Promise<string> {
     if (!USE_PROXY) {
       return '<p>Mock document content. Enable USE_PROXY to fetch real data.</p>';
     }
 
     try {
-      console.log('Fetching document:', url);
-      const proxyUrl = `/api/legislation?url=${encodeURIComponent(url)}`;
-      console.log('Proxy URL:', proxyUrl);
+      console.log('Original URL:', url);
+      
+      // Clean the URL - remove /contents, /data.htm, etc
+      let cleanUrl = url
+        .replace('/contents', '')
+        .replace('/data.htm', '')
+        .replace('/data.html', '');
+      
+      console.log('Cleaned URL:', cleanUrl);
+      
+      const proxyUrl = `/api/legislation?url=${encodeURIComponent(cleanUrl)}`;
+      console.log('Fetching via proxy:', proxyUrl);
       
       const response = await fetch(proxyUrl);
       console.log('Response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Failed to fetch document:', errorText);
+        console.error('Failed to fetch:', errorText);
         throw new Error(`Failed to fetch document: ${response.status}`);
       }
 
       const html = await response.text();
       console.log('Received HTML, length:', html.length);
       
-      // Parse and extract main content
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       
-      // legislation.gov.uk uses these classes for main content
-      let content = doc.querySelector(
-        '.LegSnippet, .LegContent, #content, .content, main, #main'
-      );
+      // Try multiple selectors for content
+      const selectors = [
+        '#viewLegContents',  // Main content area
+        '.LegContent',       // Legislation content
+        '#content',          // Generic content
+        'article',           // HTML5 article
+        'main',              // HTML5 main
+        '.content'           // Generic content class
+      ];
+      
+      let content = null;
+      for (const selector of selectors) {
+        content = doc.querySelector(selector);
+        if (content) {
+          console.log('Found content with selector:', selector);
+          break;
+        }
+      }
       
       if (!content) {
-        console.warn('No main content found, using body');
+        console.warn('No content found with known selectors, using body');
         content = doc.body;
       }
       
       if (content) {
         // Remove unwanted elements
         const unwanted = content.querySelectorAll(
-          'script, style, .navigation, .breadcrumb, .footer, nav, header, #header, #footer'
+          'script, style, .navigation, .nav, .breadcrumb, .footer, nav, header, ' +
+          '#header, #footer, .toolTip, .LegNavigation, .LegNav, .accessKey, ' +
+          '.printOptions, .moreResources'
         );
         unwanted.forEach(el => el.remove());
         
         const finalHtml = content.innerHTML;
         console.log('Extracted content, length:', finalHtml.length);
+        
+        // Check if we only got version selection links
+        if (finalHtml.includes('Latest available') && 
+            finalHtml.includes('Point in Time') && 
+            finalHtml.length < 3000) {
+          console.warn('Got version selection page, retrying with /enacted');
+          return this.getDocument(cleanUrl + '/enacted');
+        }
+        
+        // Check if content is too short (likely an error or redirect page)
+        if (finalHtml.length < 1000) {
+          console.warn('Content too short, might be a redirect page');
+          console.log('Content preview:', finalHtml.substring(0, 500));
+        }
+        
         return finalHtml;
       }
       
-      // Fallback: return body content
       console.warn('Using body as fallback');
       return doc.body.innerHTML;
       
@@ -182,17 +206,12 @@ export const legislationAPI = {
     }
   },
 
-  /**
-   * Get document as XML (CLML format)
-   * Useful for structured parsing
-   */
   async getDocumentXML(url: string): Promise<string> {
     if (!USE_PROXY) {
       return '<mock>XML content</mock>';
     }
 
     try {
-      // Append /data.xml to get XML representation
       const xmlUrl = url.endsWith('/') ? `${url}data.xml` : `${url}/data.xml`;
       const proxyUrl = `/api/legislation?url=${encodeURIComponent(xmlUrl)}`;
       
@@ -209,9 +228,6 @@ export const legislationAPI = {
     }
   },
 
-  /**
-   * Browse by type and year
-   */
   async browseByType(type: LegislationType, year?: number): Promise<SearchResult[]> {
     const params: LegislationSearchParams = {
       type,
@@ -225,9 +241,6 @@ export const legislationAPI = {
     return this.search(params);
   },
 
-  /**
-   * Get recent legislation (last 30 days)
-   */
   async getRecent(type?: LegislationType): Promise<SearchResult[]> {
     const currentYear = new Date().getFullYear();
     return this.search({
@@ -238,36 +251,35 @@ export const legislationAPI = {
     });
   },
 
-  // Mock data for development/testing
   getMockResults(query: string): SearchResult[] {
     return [
       {
         title: 'Companies Act 2006',
-        url: `${LEGISLATION_BASE}/ukpga/2006/46/contents`,
+        url: `${LEGISLATION_BASE}/ukpga/2006/46`,
         snippet: 'An Act to reform company law and restate the greater part of the enactments relating to companies...',
         source: 'legislation' as const,
       },
       {
         title: 'Employment Rights Act 1996',
-        url: `${LEGISLATION_BASE}/ukpga/1996/18/contents`,
+        url: `${LEGISLATION_BASE}/ukpga/1996/18`,
         snippet: 'An Act to consolidate enactments relating to employment rights...',
         source: 'legislation' as const,
       },
       {
         title: 'Data Protection Act 2018',
-        url: `${LEGISLATION_BASE}/ukpga/2018/12/contents`,
+        url: `${LEGISLATION_BASE}/ukpga/2018/12`,
         snippet: 'An Act to make provision for the regulation of the processing of information relating to individuals...',
         source: 'legislation' as const,
       },
       {
         title: 'Consumer Rights Act 2015',
-        url: `${LEGISLATION_BASE}/ukpga/2015/15/contents`,
+        url: `${LEGISLATION_BASE}/ukpga/2015/15`,
         snippet: 'An Act to amend the law relating to the rights of consumers...',
         source: 'legislation' as const,
       },
       {
         title: 'Equality Act 2010',
-        url: `${LEGISLATION_BASE}/ukpga/2010/15/contents`,
+        url: `${LEGISLATION_BASE}/ukpga/2010/15`,
         snippet: 'An Act to make provision to require Ministers of the Crown and others when making strategic decisions about the exercise of their functions to have regard to the desirability of reducing socio-economic inequalities...',
         source: 'legislation' as const,
       },

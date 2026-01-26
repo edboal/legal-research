@@ -4,11 +4,11 @@
 
 @layer base {
   * {
-    @apply border-shadow-grey;
+    @apply border-dim-grey;
   }
   
   body {
-    @apply m-0 bg-shadow-grey text-cotton-rose;
+    @apply m-0 bg-sand-dune text-iron-grey;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
       sans-serif;
@@ -23,31 +23,97 @@
   overflow: hidden;
 }
 
-/* Prose styling for document content */
-.prose {
-  @apply text-cotton-rose;
+/* Enhanced legislation content styling */
+.legislation-content {
+  @apply text-iron-grey;
+  line-height: 1.75;
+  font-size: 16px;
 }
 
-.prose h1,
-.prose h2,
-.prose h3,
-.prose h4 {
-  @apply text-cotton-rose font-semibold;
+.legislation-content h1,
+.legislation-content h2,
+.legislation-content h3,
+.legislation-content h4 {
+  @apply text-iron-grey font-bold mt-6 mb-3;
 }
 
-.prose a {
-  @apply text-purple-x11 hover:text-petal-pink;
+.legislation-content h1 {
+  @apply text-2xl;
 }
 
-.prose p {
-  @apply text-cotton-rose/90;
+.legislation-content h2 {
+  @apply text-xl;
 }
 
-.prose strong {
-  @apply text-cotton-rose font-semibold;
+.legislation-content h3 {
+  @apply text-lg;
 }
 
-.prose ul,
-.prose ol {
-  @apply text-cotton-rose/90;
+.legislation-content a {
+  @apply text-cool-steel underline hover:text-iron-grey;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.legislation-content p {
+  @apply text-iron-grey/90 mb-4;
+}
+
+.legislation-content strong,
+.legislation-content b {
+  @apply text-iron-grey font-semibold;
+}
+
+.legislation-content ul,
+.legislation-content ol {
+  @apply text-iron-grey/90 my-4 pl-6;
+}
+
+.legislation-content li {
+  @apply mb-2;
+}
+
+.legislation-content table {
+  @apply w-full border-collapse my-4;
+}
+
+.legislation-content th {
+  @apply bg-khaki-beige text-iron-grey font-semibold p-3 border border-dim-grey/30 text-left;
+}
+
+.legislation-content td {
+  @apply p-3 border border-dim-grey/30;
+}
+
+.legislation-content blockquote {
+  @apply border-l-4 border-cool-steel pl-4 my-4 italic text-dim-grey;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-khaki-beige/30;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-cool-steel rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-iron-grey;
+}
+
+/* Selection */
+::selection {
+  @apply bg-cool-steel/40 text-iron-grey;
+}
+
+/* Focus outline */
+*:focus-visible {
+  outline: 2px solid theme('colors.cool-steel');
+  outline-offset: 2px;
 }

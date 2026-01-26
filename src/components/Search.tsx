@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search as SearchIcon, Filter } from 'lucide-react';
+import { Search as SearchIcon, Filter, X } from 'lucide-react';
 import type { SearchResult } from '../types';
 import { legislationAPI, type LegislationType } from '../services/legislationAPI';
 
@@ -61,9 +61,9 @@ export function Search({ onSelectResult }: SearchProps) {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="h-full flex flex-col bg-shadow-grey">
+    <div className="h-full flex flex-col bg-khaki-beige">
       {/* Search Header */}
-      <div className="p-4 border-b border-indigo-velvet">
+      <div className="p-4 bg-iron-grey border-b-2 border-dim-grey">
         <form onSubmit={handleSearch} className="space-y-3">
           {/* Search Input */}
           <div className="relative">
@@ -72,9 +72,18 @@ export function Search({ onSelectResult }: SearchProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by title (e.g., Companies Act 2006)..."
-              className="w-full px-4 py-2 pl-10 bg-indigo-velvet text-white placeholder-cotton-rose/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-bright border border-petal-pink/20"
+              className="w-full px-4 py-2.5 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30 shadow-sm"
             />
-            <SearchIcon className="absolute left-3 top-2.5 h-5 w-5 text-purple-bright" />
+            <SearchIcon className="absolute left-3 top-3 h-5 w-5 text-dim-grey" />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-3 text-dim-grey hover:text-iron-grey"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           {/* Type Filter */}
@@ -82,7 +91,7 @@ export function Search({ onSelectResult }: SearchProps) {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value as LegislationType | '*')}
-              className="w-full px-3 py-2 bg-indigo-velvet text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-bright border border-petal-pink/20"
+              className="w-full px-3 py-2.5 bg-sand-dune text-iron-grey rounded-lg focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30 shadow-sm font-medium"
             >
               <option value="*">All Legislation Types</option>
               <optgroup label="Acts">
@@ -108,7 +117,7 @@ export function Search({ onSelectResult }: SearchProps) {
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 text-sm text-cotton-rose-light hover:text-purple-bright"
+            className="flex items-center gap-2 text-sm text-sand-dune hover:text-cool-steel font-medium"
           >
             <Filter size={16} />
             {showFilters ? 'Hide' : 'Show'} Year Filters
@@ -116,7 +125,7 @@ export function Search({ onSelectResult }: SearchProps) {
 
           {/* Year Range Filters */}
           {showFilters && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <input
                 type="number"
                 value={startYear}
@@ -124,7 +133,7 @@ export function Search({ onSelectResult }: SearchProps) {
                 placeholder="From year"
                 min="1800"
                 max={currentYear}
-                className="px-3 py-2 bg-indigo-velvet text-white placeholder-cotton-rose/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-bright border border-petal-pink/20"
+                className="px-3 py-2 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
               />
               <input
                 type="number"
@@ -133,17 +142,17 @@ export function Search({ onSelectResult }: SearchProps) {
                 placeholder="To year"
                 min="1800"
                 max={currentYear}
-                className="px-3 py-2 bg-indigo-velvet text-white placeholder-cotton-rose/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-bright border border-petal-pink/20"
+                className="px-3 py-2 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
               />
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-purple-bright text-white font-medium py-2 rounded-lg hover:bg-purple-x11 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-cool-steel text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-sand-dune transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow"
             >
               {loading ? 'Searching...' : 'Search'}
             </button>
@@ -151,7 +160,7 @@ export function Search({ onSelectResult }: SearchProps) {
               type="button"
               onClick={handleBrowseRecent}
               disabled={loading}
-              className="px-4 py-2 bg-indigo-velvet text-white font-medium rounded-lg hover:bg-petal-pink-dark transition-colors disabled:opacity-50 border border-petal-pink/20"
+              className="px-4 py-2.5 bg-dim-grey text-sand-dune font-medium rounded-lg hover:bg-iron-grey transition-all disabled:opacity-50 shadow-sm"
             >
               Recent
             </button>
@@ -159,9 +168,10 @@ export function Search({ onSelectResult }: SearchProps) {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="px-4 py-2 text-cotton-rose-light hover:text-white transition-colors"
+                className="px-3 py-2.5 text-sand-dune hover:text-cool-steel transition-colors"
+                title="Clear filters"
               >
-                Clear
+                <X size={20} />
               </button>
             )}
           </div>
@@ -171,9 +181,10 @@ export function Search({ onSelectResult }: SearchProps) {
       {/* Results */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {results.length === 0 && !loading && (
-          <div className="text-center text-cotton-rose-light py-8">
-            <p className="mb-2 text-lg">Search UK legislation</p>
-            <p className="text-sm text-cotton-rose/70">
+          <div className="text-center text-dim-grey py-8 px-4">
+            <SearchIcon className="mx-auto h-12 w-12 text-dim-grey/30 mb-3" />
+            <p className="text-lg font-medium mb-2">Search UK Legislation</p>
+            <p className="text-sm text-dim-grey/70">
               Try: "Companies Act 2006", "Employment Rights", or browse recent legislation
             </p>
           </div>
@@ -183,14 +194,14 @@ export function Search({ onSelectResult }: SearchProps) {
           <button
             key={idx}
             onClick={() => onSelectResult(result)}
-            className="w-full text-left p-3 bg-indigo-velvet hover:bg-petal-pink-dark rounded-lg transition-colors group border border-petal-pink/10 hover:border-purple-bright"
+            className="w-full text-left p-4 bg-sand-dune hover:bg-cool-steel/30 rounded-lg transition-all group border border-dim-grey/20 hover:border-cool-steel shadow-sm hover:shadow"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
-                <h3 className="text-white font-medium group-hover:text-cotton-rose-light transition-colors">
+                <h3 className="text-iron-grey font-semibold group-hover:text-dim-grey transition-colors leading-tight">
                   {result.title}
                 </h3>
-                <p className="text-sm text-cotton-rose/80 mt-1 line-clamp-2">
+                <p className="text-sm text-dim-grey/80 mt-1.5 line-clamp-2 leading-relaxed">
                   {result.snippet}
                 </p>
               </div>
@@ -199,8 +210,9 @@ export function Search({ onSelectResult }: SearchProps) {
         ))}
 
         {loading && (
-          <div className="text-center text-purple-bright py-4">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-bright border-t-transparent"></div>
+          <div className="text-center text-cool-steel py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-cool-steel border-t-transparent"></div>
+            <p className="text-sm text-dim-grey mt-3">Searching legislation...</p>
           </div>
         )}
       </div>

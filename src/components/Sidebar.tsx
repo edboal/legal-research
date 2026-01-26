@@ -59,20 +59,20 @@ export function Sidebar({
     return (
       <div key={folder.id}>
         <div
-          className="flex items-center gap-2 px-3 py-2 hover:bg-petal-pink-dark cursor-pointer group"
+          className="flex items-center gap-2 px-3 py-2 hover:bg-cool-steel/20 cursor-pointer group rounded-md mx-1"
           style={{ paddingLeft: `${depth * 12 + 12}px` }}
         >
           <button
             onClick={() => toggleFolder(folder.id)}
-            className="text-purple-bright hover:text-white"
+            className="text-dim-grey hover:text-iron-grey"
           >
             {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
-          <FolderIcon size={16} className="text-purple-bright" />
-          <span className="flex-1 text-white text-sm">{folder.name}</span>
+          <FolderIcon size={16} className="text-cool-steel" />
+          <span className="flex-1 text-iron-grey text-sm font-medium">{folder.name}</span>
           <button
             onClick={() => onDeleteFolder(folder.id)}
-            className="opacity-0 group-hover:opacity-100 text-cotton-rose hover:text-red-400"
+            className="opacity-0 group-hover:opacity-100 text-dim-grey hover:text-red-600 transition-opacity"
           >
             <Trash2 size={14} />
           </button>
@@ -84,12 +84,12 @@ export function Sidebar({
               <button
                 key={doc.id}
                 onClick={() => onSelectDocument(doc.id)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-petal-pink-dark ${
-                  selectedDocumentId === doc.id ? 'bg-purple-bright/20 border-l-2 border-purple-bright' : ''
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-cool-steel/20 rounded-md mx-1 ${
+                  selectedDocumentId === doc.id ? 'bg-cool-steel/40 border-l-2 border-iron-grey' : ''
                 }`}
                 style={{ paddingLeft: `${(depth + 1) * 12 + 28}px` }}
               >
-                <span className="text-white line-clamp-1">{doc.title}</span>
+                <span className="text-iron-grey line-clamp-1">{doc.title}</span>
               </button>
             ))}
             {subFolders.map(subFolder => renderFolder(subFolder, depth + 1))}
@@ -100,50 +100,51 @@ export function Sidebar({
   };
 
   return (
-    <div className="w-64 h-full bg-indigo-velvet border-r border-petal-pink/20 flex flex-col">
+    <div className="w-64 h-full bg-khaki-beige border-r-2 border-dim-grey flex flex-col">
       {/* Favorites Section */}
-      <div className="border-b border-petal-pink/20">
-        <div className="px-3 py-2 flex items-center gap-2 text-white font-medium">
-          <Star size={16} className="text-purple-bright" />
-          <span className="text-sm">Favorites</span>
+      <div className="border-b border-dim-grey/30 bg-iron-grey">
+        <div className="px-3 py-2.5 flex items-center gap-2">
+          <Star size={16} className="text-sand-dune fill-sand-dune" />
+          <span className="text-sm font-semibold text-sand-dune">Favorites</span>
         </div>
-        <div className="max-h-32 overflow-y-auto">
-          {favorites.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-cotton-rose/70">No favorites yet</div>
-          ) : (
-            favorites.map(doc => (
-              <button
-                key={doc.id}
-                onClick={() => onSelectDocument(doc.id)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-petal-pink-dark ${
-                  selectedDocumentId === doc.id ? 'bg-purple-bright/20 border-l-2 border-purple-bright' : ''
-                }`}
-              >
-                <span className="text-white line-clamp-1">{doc.title}</span>
-              </button>
-            ))
-          )}
-        </div>
+      </div>
+      <div className="max-h-32 overflow-y-auto border-b border-dim-grey/30 bg-iron-grey/5">
+        {favorites.length === 0 ? (
+          <div className="px-3 py-3 text-xs text-dim-grey/60 italic">No favorites yet</div>
+        ) : (
+          favorites.map(doc => (
+            <button
+              key={doc.id}
+              onClick={() => onSelectDocument(doc.id)}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-cool-steel/20 rounded-md mx-1 ${
+                selectedDocumentId === doc.id ? 'bg-cool-steel/40 border-l-2 border-iron-grey' : ''
+              }`}
+            >
+              <span className="text-iron-grey line-clamp-1 font-medium">{doc.title}</span>
+            </button>
+          ))
+        )}
       </div>
 
       {/* Folders Section */}
       <div className="flex-1 overflow-y-auto">
-        <div className="px-3 py-2 flex items-center justify-between text-white font-medium border-b border-petal-pink/20">
+        <div className="px-3 py-2.5 flex items-center justify-between bg-iron-grey border-b border-dim-grey/30">
           <div className="flex items-center gap-2">
-            <FolderIcon size={16} className="text-purple-bright" />
-            <span className="text-sm">Folders</span>
+            <FolderIcon size={16} className="text-sand-dune" />
+            <span className="text-sm font-semibold text-sand-dune">Folders</span>
           </div>
           <button
             onClick={() => setIsCreating(true)}
-            className="text-purple-bright hover:text-white"
+            className="text-sand-dune hover:text-cool-steel transition-colors"
+            title="Create folder"
           >
-            <Plus size={16} />
+            <Plus size={18} />
           </button>
         </div>
 
         {/* New Folder Input */}
         {isCreating && (
-          <div className="px-3 py-2 border-b border-petal-pink/20">
+          <div className="px-3 py-3 border-b border-dim-grey/30 bg-iron-grey/5">
             <input
               type="text"
               value={newFolderName}
@@ -157,7 +158,7 @@ export function Sidebar({
               }}
               onBlur={handleCreateFolder}
               placeholder="Folder name..."
-              className="w-full px-2 py-1 bg-shadow-grey text-white text-sm rounded focus:outline-none focus:ring-1 focus:ring-purple-bright"
+              className="w-full px-2 py-1.5 bg-sand-dune text-iron-grey text-sm rounded focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
               autoFocus
             />
           </div>
@@ -166,7 +167,7 @@ export function Sidebar({
         {/* Folder Tree */}
         <div className="py-2">
           {rootFolders.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-cotton-rose/70">No folders yet</div>
+            <div className="px-3 py-3 text-xs text-dim-grey/60 italic">No folders yet</div>
           ) : (
             rootFolders.map(folder => renderFolder(folder))
           )}
@@ -174,17 +175,17 @@ export function Sidebar({
 
         {/* Unfiled Documents */}
         {getDocumentsInFolder(null).length > 0 && (
-          <div className="border-t border-petal-pink/20">
-            <div className="px-3 py-2 text-xs text-cotton-rose/70 font-medium">Unfiled</div>
+          <div className="border-t border-dim-grey/30 mt-2 pt-2">
+            <div className="px-3 py-1.5 text-xs text-dim-grey/70 font-semibold uppercase tracking-wider">Unfiled</div>
             {getDocumentsInFolder(null).map(doc => (
               <button
                 key={doc.id}
                 onClick={() => onSelectDocument(doc.id)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-petal-pink-dark ${
-                  selectedDocumentId === doc.id ? 'bg-purple-bright/20 border-l-2 border-purple-bright' : ''
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-cool-steel/20 rounded-md mx-1 ${
+                  selectedDocumentId === doc.id ? 'bg-cool-steel/40 border-l-2 border-iron-grey' : ''
                 }`}
               >
-                <span className="text-white line-clamp-1">{doc.title}</span>
+                <span className="text-iron-grey line-clamp-1">{doc.title}</span>
               </button>
             ))}
           </div>
