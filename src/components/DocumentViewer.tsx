@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, ChevronLeft, ChevronRight, FileText, List, BookOpen, ArrowUp, Loader } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, 
+         ChevronLeft, ChevronRight, List, ArrowUp, Search, AlertCircle, 
+         CheckCircle, AlertTriangle } from 'lucide-react';
 import type { Document, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -15,10 +17,8 @@ interface Provision {
   id: string;
   title: string;
   content: string;
-  number?: string;
+  number: string;
 }
-
-type TabType = 'toc' | 'content' | 'notes';
 
 export function DocumentViewer({
   document,
@@ -31,12 +31,12 @@ export function DocumentViewer({
   const [showFolderMenu, setShowFolderMenu] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [highlightMode, setHighlightMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('toc');
   const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showTOC, setShowTOC] = useState(true);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  // Parse document into provisions
+  // Parse document into GROUPED provisions (not line-by-line)
   const provisions = useMemo(() => {
     if (!document?.content) return [];
     
@@ -44,26 +44,22 @@ export function DocumentViewer({
     const doc = parser.parseFromString(document.content, 'text/html');
     const provisionsList: Provision[] = [];
     
-    // Find all major provisions
-    const provisionElements = doc.querySelectorAll(
-      '.LegP1Container, .LegP1Group, .LegClearFix, section, article'
-    );
+    // Strategy 1: Look for major provision containers (sections, parts, chapters)
+    const majorContainers = doc.querySelectorAll('.LegP1Group, .LegPart, .LegChapter');
     
-    if (provisionElements.length > 0) {
-      provisionElements.forEach((element, index) => {
-        // Get section number
-        const numberEl = element.querySelector('.LegP1No, .LegSectionNo, .number');
-        const number = numberEl?.textContent?.trim() || `${index + 1}`;
-        
-        // Get title/heading - remove "U.K." suffix
-        const titleEl = element.querySelector('.LegP1GroupTitle, .LegHeading, h1, h2, h3, h4');
-        let title = titleEl?.textContent?.trim() || `Provision ${number}`;
+    if (majorContainers.length > 0) {
+      majorContainers.forEach((container, index) => {
+        const titleEl = container.querySelector('.LegP1GroupTitle, .LegPartTitle, .LegChapterTitle');
+        let title = titleEl?.textContent?.trim() || `Provision ${index + 1}`;
         title = title.replace(/\s*U\.K\.\s*$/i, '').trim();
         
-        // Get full content
-        const content = element.outerHTML;
+        const numberEl = container.querySelector('.LegP1No, .LegPartNo, .LegChapterNo');
+        const number = numberEl?.textContent?.trim() || `${index + 1}`;
         
-        if (content && content.length > 100) {
+        const content = container.outerHTML;
+        
+        // Only add if has substantial content (not just a title)
+        if (content.length > 500) {
           provisionsList.push({
             id: `provision-${index}`,
             title,
@@ -74,57 +70,128 @@ export function DocumentViewer({
       });
     }
     
-    // Fallback: split by headings
+    // Strategy 2: If no major containers, group by sections
     if (provisionsList.length === 0) {
-      const headings = doc.querySelectorAll('h1, h2, h3, .LegHeading');
+      const sections = doc.querySelectorAll('section, .LegSection, [class*="Section"]');
       
-      if (headings.length > 0) {
-        headings.forEach((heading, index) => {
-          let headingText = heading.textContent?.trim() || `Section ${index + 1}`;
-          headingText = headingText.replace(/\s*U\.K\.\s*$/i, '').trim();
-          
-          let contentHtml = heading.outerHTML;
-          let nextElement = heading.nextElementSibling;
-          
-          while (nextElement && !nextElement.matches('h1, h2, h3, .LegHeading')) {
-            contentHtml += nextElement.outerHTML;
-            nextElement = nextElement.nextElementSibling;
-          }
-          
-          if (contentHtml.length > 150) {
-            provisionsList.push({
-              id: `section-${index}`,
-              title: headingText,
-              number: `${index + 1}`,
-              content: contentHtml
-            });
-          }
-        });
-      } else {
-        // Last resort: entire document
-        provisionsList.push({
-          id: 'full-document',
-          title: 'Full Document',
-          number: '1',
-          content: doc.body.innerHTML
-        });
-      }
+      sections.forEach((section, index) => {
+        const titleEl = section.querySelector('h1, h2, h3, .LegSectionTitle');
+        let title = titleEl?.textContent?.trim() || `Section ${index + 1}`;
+        title = title.replace(/\s*U\.K\.\s*$/i, '').trim();
+        
+        const content = section.outerHTML;
+        
+        if (content.length > 500) {
+          provisionsList.push({
+            id: `section-${index}`,
+            title,
+            number: `${index + 1}`,
+            content
+          });
+        }
+      });
+    }
+    
+    // Strategy 3: Fallback - group by major headings with following content
+    if (provisionsList.length === 0) {
+      const headings = doc.querySelectorAll('h1, h2, .LegHeading');
+      
+      headings.forEach((heading, index) => {
+        let title = heading.textContent?.trim() || `Section ${index + 1}`;
+        title = title.replace(/\s*U\.K\.\s*$/i, '').trim();
+        
+        // Collect content until next heading
+        let contentHtml = heading.outerHTML;
+        let sibling = heading.nextElementSibling;
+        
+        while (sibling && !sibling.matches('h1, h2, .LegHeading')) {
+          contentHtml += sibling.outerHTML;
+          sibling = sibling.nextElementSibling;
+        }
+        
+        if (contentHtml.length > 500) {
+          provisionsList.push({
+            id: `heading-${index}`,
+            title,
+            number: `${index + 1}`,
+            content: contentHtml
+          });
+        }
+      });
+    }
+    
+    // Last resort: show entire document
+    if (provisionsList.length === 0) {
+      provisionsList.push({
+        id: 'full-document',
+        title: 'Full Document',
+        number: '1',
+        content: doc.body.innerHTML
+      });
     }
     
     return provisionsList;
   }, [document?.content]);
 
-  // Reset to first provision when document changes
+  // Filter provisions based on search query
+  const filteredProvisions = useMemo(() => {
+    if (!searchQuery.trim()) return provisions;
+    
+    const query = searchQuery.toLowerCase();
+    return provisions.filter(p => 
+      p.title.toLowerCase().includes(query) ||
+      p.number.toLowerCase().includes(query)
+    );
+  }, [provisions, searchQuery]);
+
+  // Determine document status
+  const getDocumentStatus = () => {
+    if (!document) return null;
+    
+    const url = document.url.toLowerCase();
+    
+    if (url.includes('/enacted')) {
+      return {
+        type: 'enacted',
+        label: 'As Enacted',
+        color: 'bg-status-green/20 text-status-green',
+        icon: CheckCircle,
+        tooltip: 'This is the original version of the legislation as it was initially enacted or made.'
+      };
+    } else if (url.includes('/data.htm') || /\/\d{4}-\d{2}-\d{2}/.test(url)) {
+      return {
+        type: 'revised',
+        label: 'Revised',
+        color: 'bg-status-amber/20 text-status-amber',
+        icon: AlertTriangle,
+        tooltip: 'This is a revised version that may incorporate subsequent amendments and changes.'
+      };
+    } else {
+      return {
+        type: 'latest',
+        label: 'Latest',
+        color: 'bg-status-blue/20 text-status-blue',
+        icon: AlertCircle,
+        tooltip: 'This is the latest available version of the legislation.'
+      };
+    }
+  };
+
+  const status = getDocumentStatus();
+
+  // Scroll to top of content area
+  const scrollToTop = () => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Reset when document changes
   useEffect(() => {
     setCurrentProvisionIndex(0);
-    setActiveTab('toc');
-    setIsProcessing(false);
+    setSearchQuery('');
+    setShowTOC(true);
   }, [document?.id]);
-
-  // Scroll to top function
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   if (!document) {
     return (
@@ -140,21 +207,9 @@ export function DocumentViewer({
     );
   }
 
-  // Show loading state while processing
-  if (isProcessing) {
-    return (
-      <div className="h-full flex items-center justify-center bg-sand-dune">
-        <div className="text-center px-8">
-          <Loader className="w-12 h-12 mx-auto mb-4 text-iron-grey animate-spin" />
-          <p className="text-lg font-semibold text-iron-grey">Loading document...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const currentProvision = provisions[currentProvisionIndex];
+  const currentProvision = filteredProvisions[currentProvisionIndex];
   const hasPrevious = currentProvisionIndex > 0;
-  const hasNext = currentProvisionIndex < provisions.length - 1;
+  const hasNext = currentProvisionIndex < filteredProvisions.length - 1;
 
   const handleAddComment = () => {
     if (!newComment.trim()) return;
@@ -172,37 +227,70 @@ export function DocumentViewer({
 
   const goToProvision = (index: number) => {
     setCurrentProvisionIndex(index);
-    setActiveTab('content');
+    setShowTOC(false);
     scrollToTop();
   };
 
+  const StatusIcon = status?.icon || AlertCircle;
+
   return (
     <div className="h-full flex flex-col bg-sand-dune relative">
-      {/* Scroll to Top Button */}
+      {/* Scroll to Top Button - Fixed Position */}
       <button
         onClick={scrollToTop}
-        className="fixed bottom-8 right-8 w-12 h-12 bg-iron-grey text-white rounded-full shadow-lg hover:bg-dim-grey transition-all z-50 flex items-center justify-center"
+        className="fixed bottom-8 right-8 w-12 h-12 bg-iron-grey text-white rounded-full shadow-lg hover:bg-bronze transition-all z-50 flex items-center justify-center"
         title="Scroll to top"
+        aria-label="Scroll to top"
       >
         <ArrowUp size={24} />
       </button>
 
-      {/* Document Header */}
+      {/* Header */}
       <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-white mb-2 leading-tight">
-              {document.title}
-            </h1>
-            <a
-              href={document.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-cool-steel hover:text-white flex items-center gap-1 w-fit"
-            >
-              <ExternalLink size={14} />
-              <span className="truncate">View on legislation.gov.uk</span>
-            </a>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-lg font-bold text-white leading-tight">
+                {document.title}
+              </h1>
+              
+              {/* Status Indicator */}
+              {status && (
+                <div className="group relative">
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${status.color} text-xs font-semibold border-2 border-current`}>
+                    <StatusIcon size={14} />
+                    <span>{status.label}</span>
+                  </div>
+                  {/* Tooltip */}
+                  <div className="absolute left-0 top-full mt-2 w-72 bg-white border-2 border-iron-grey rounded-lg shadow-xl p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <p className="text-sm text-iron-grey">{status.tooltip}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-4 flex-wrap">
+              <a
+                href={document.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-cool-steel hover:text-white flex items-center gap-1"
+              >
+                <ExternalLink size={14} />
+                <span>View on legislation.gov.uk</span>
+              </a>
+              
+              {/* Outstanding Changes Link */}
+              <a
+                href={`${document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '')}/changes`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-bronze hover:text-white flex items-center gap-1 font-medium"
+              >
+                <AlertTriangle size={14} />
+                <span>View Outstanding Changes</span>
+              </a>
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -256,25 +344,13 @@ export function DocumentViewer({
             </div>
 
             <button
-              onClick={() => setHighlightMode(!highlightMode)}
-              className={`p-2 rounded-lg transition-all relative ${
-                highlightMode 
-                  ? 'bg-white text-iron-grey' 
-                  : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
-              }`}
-              title="Highlight mode"
-            >
-              <Highlighter size={18} />
-            </button>
-
-            <button
               onClick={() => setShowComments(!showComments)}
               className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative"
               title="Toggle comments"
             >
               <MessageSquare size={18} />
               {document.comments.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-cool-steel text-white text-xs font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {document.comments.length}
                 </span>
               )}
@@ -290,12 +366,12 @@ export function DocumentViewer({
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tab Navigation */}
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTab('toc')}
+            onClick={() => setShowTOC(true)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-              activeTab === 'toc'
+              showTOC
                 ? 'bg-white text-iron-grey shadow-lg'
                 : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
             }`}
@@ -304,39 +380,42 @@ export function DocumentViewer({
             Contents ({provisions.length})
           </button>
           <button
-            onClick={() => setActiveTab('content')}
+            onClick={() => setShowTOC(false)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-              activeTab === 'content'
+              !showTOC
                 ? 'bg-white text-iron-grey shadow-lg'
                 : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
             }`}
           >
-            <FileText size={16} />
             Provisions
-          </button>
-          <button
-            onClick={() => setActiveTab('notes')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-              activeTab === 'notes'
-                ? 'bg-white text-iron-grey shadow-lg'
-                : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
-            }`}
-          >
-            <BookOpen size={16} />
-            Notes
           </button>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto bg-white">
-          {/* Table of Contents Tab */}
-          {activeTab === 'toc' && (
+        <div ref={contentRef} className="flex-1 overflow-y-auto bg-white">
+          {/* Table of Contents */}
+          {showTOC && (
             <div className="p-8 max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold text-iron-grey mb-6">Table of Contents</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-iron-grey">Table of Contents</h2>
+                
+                {/* Live Search */}
+                <div className="relative w-80">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search provisions..."
+                    className="w-full px-4 py-2 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-iron-grey border border-dim-grey/30"
+                  />
+                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-dim-grey" />
+                </div>
+              </div>
+              
               <div className="space-y-1">
-                {provisions.map((provision, index) => (
+                {filteredProvisions.map((provision, index) => (
                   <button
                     key={provision.id}
                     onClick={() => goToProvision(index)}
@@ -352,14 +431,20 @@ export function DocumentViewer({
                     </div>
                   </button>
                 ))}
+                
+                {filteredProvisions.length === 0 && (
+                  <div className="text-center py-8 text-dim-grey">
+                    No provisions match "{searchQuery}"
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Content Tab with Pagination */}
-          {activeTab === 'content' && currentProvision && (
+          {/* Provision Content */}
+          {!showTOC && currentProvision && (
             <div className="flex flex-col h-full">
-              {/* Provision Navigation */}
+              {/* Navigation Bar */}
               <div className="bg-sand-dune border-b-2 border-dim-grey px-8 py-4 flex items-center justify-between flex-shrink-0">
                 <button
                   onClick={() => {
@@ -367,7 +452,7 @@ export function DocumentViewer({
                     scrollToTop();
                   }}
                   disabled={!hasPrevious}
-                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
+                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
                 >
                   <ChevronLeft size={18} />
                   Previous
@@ -375,10 +460,10 @@ export function DocumentViewer({
                 
                 <div className="text-center">
                   <div className="text-sm text-dim-grey font-medium">
-                    Provision {currentProvisionIndex + 1} of {provisions.length}
+                    Provision {currentProvisionIndex + 1} of {filteredProvisions.length}
                   </div>
                   <div className="text-lg font-bold text-iron-grey">
-                    {currentProvision.number}
+                    {currentProvision.number} - {currentProvision.title}
                   </div>
                 </div>
 
@@ -388,7 +473,7 @@ export function DocumentViewer({
                     scrollToTop();
                   }}
                   disabled={!hasNext}
-                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
+                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
                 >
                   Next
                   <ChevronRight size={18} />
@@ -399,32 +484,10 @@ export function DocumentViewer({
               <div className="flex-1 overflow-y-auto p-8">
                 <div className="max-w-4xl mx-auto">
                   <div 
-                    className="legislation-provision"
+                    className="legislation-provision prose prose-lg max-w-none"
                     dangerouslySetInnerHTML={{ __html: currentProvision.content }}
                   />
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Notes Tab */}
-          {activeTab === 'notes' && (
-            <div className="p-8 max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold text-iron-grey mb-6">Explanatory Notes</h2>
-              <div className="bg-sand-dune border-2 border-iron-grey/30 rounded-lg p-6">
-                <p className="text-iron-grey mb-4">
-                  Explanatory notes are not currently available through the API.
-                  You can view them directly on legislation.gov.uk.
-                </p>
-                <a
-                  href={`${document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '')}/notes/contents`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all font-semibold"
-                >
-                  <ExternalLink size={16} />
-                  View Explanatory Notes
-                </a>
               </div>
             </div>
           )}
@@ -444,13 +507,13 @@ export function DocumentViewer({
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..."
-                  className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
+                  className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
                   rows={3}
                 />
                 <button
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
-                  className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-cool-steel hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add Comment
                 </button>
