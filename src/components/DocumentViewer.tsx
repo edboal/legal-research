@@ -81,7 +81,7 @@ export function DocumentViewer({
 
   // Scroll to section
   const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
+    const element = window.document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       // Highlight temporarily
