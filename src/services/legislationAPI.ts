@@ -122,35 +122,50 @@ export const legislationAPI = {
     }
 
     try {
+      console.log('Fetching document:', url);
       const proxyUrl = `/api/legislation?url=${encodeURIComponent(url)}`;
+      console.log('Proxy URL:', proxyUrl);
+      
       const response = await fetch(proxyUrl);
+      console.log('Response status:', response.status);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch document');
+        const errorText = await response.text();
+        console.error('Failed to fetch document:', errorText);
+        throw new Error(`Failed to fetch document: ${response.status}`);
       }
 
       const html = await response.text();
+      console.log('Received HTML, length:', html.length);
       
       // Parse and extract main content
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       
       // legislation.gov.uk uses these classes for main content
-      const content = doc.querySelector(
-        '.LegSnippet, .LegContent, #content, .content, main'
+      let content = doc.querySelector(
+        '.LegSnippet, .LegContent, #content, .content, main, #main'
       );
+      
+      if (!content) {
+        console.warn('No main content found, using body');
+        content = doc.body;
+      }
       
       if (content) {
         // Remove unwanted elements
         const unwanted = content.querySelectorAll(
-          'script, style, .navigation, .breadcrumb, .footer'
+          'script, style, .navigation, .breadcrumb, .footer, nav, header, #header, #footer'
         );
         unwanted.forEach(el => el.remove());
         
-        return content.innerHTML;
+        const finalHtml = content.innerHTML;
+        console.log('Extracted content, length:', finalHtml.length);
+        return finalHtml;
       }
       
       // Fallback: return body content
+      console.warn('Using body as fallback');
       return doc.body.innerHTML;
       
     } catch (error) {

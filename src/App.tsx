@@ -29,7 +29,9 @@ function App() {
 
     // Fetch document content
     try {
+      console.log('Loading document from:', result.url);
       const content = await legislationAPI.getDocument(result.url);
+      console.log('Document loaded successfully');
 
       const newDocument: Document = {
         id: crypto.randomUUID(),
@@ -50,7 +52,8 @@ function App() {
       setShowSearch(false);
     } catch (error) {
       console.error('Error loading document:', error);
-      alert('Failed to load document. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to load document: ${errorMessage}\n\nPlease check the browser console for details.`);
     }
   };
 
@@ -103,12 +106,12 @@ function App() {
   return (
     <div className="h-screen flex flex-col bg-shadow-grey">
       {/* Header */}
-      <header className="bg-indigo-velvet border-b border-shadow-grey px-6 py-4">
+      <header className="bg-indigo-velvet border-b border-petal-pink/20 px-6 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-cotton-rose">Legal Research Tool</h1>
+          <h1 className="text-xl font-bold text-white">Legal Research Tool</h1>
           <button
             onClick={() => setShowSearch(!showSearch)}
-            className="px-4 py-2 bg-purple-x11 text-white rounded-lg hover:bg-petal-pink transition-colors text-sm"
+            className="px-4 py-2 bg-purple-bright text-white font-medium rounded-lg hover:bg-purple-x11 transition-colors text-sm"
           >
             {showSearch ? 'Hide Search' : 'Show Search'}
           </button>

@@ -28,8 +28,11 @@ export function DocumentViewer({
 
   if (!document) {
     return (
-      <div className="h-full flex items-center justify-center bg-shadow-grey text-petal-pink/50">
-        Select a document to view
+      <div className="h-full flex items-center justify-center bg-shadow-grey text-cotton-rose-light">
+        <div className="text-center">
+          <p className="text-lg">Select a document to view</p>
+          <p className="text-sm text-cotton-rose/70 mt-2">Search for legislation or browse your saved documents</p>
+        </div>
       </div>
     );
   }
