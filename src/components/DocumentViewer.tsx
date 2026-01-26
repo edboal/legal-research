@@ -3,7 +3,7 @@ import { Star, FolderInput, Trash2, MessageSquare, ExternalLink,
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
-         StickyNote, FileText } from 'lucide-react';
+         StickyNote } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -164,8 +164,6 @@ export function DocumentViewer({
     }
 
     // Check for version info
-    const documentMainType = metadata.querySelector('DocumentMainType');
-    const year = metadata.querySelector('Year');
     const enacted = metadata.querySelector('EnactmentDate, Made');
     const modified = metadata.querySelector('Modified');
     
@@ -336,7 +334,7 @@ export function DocumentViewer({
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
         // Process the XML to handle links and clean up
-        const processedContent = processProvisionXML(body, xmlDoc);
+        const processedContent = processProvisionXML(body);
         setProvisionContent(processedContent);
         
         // Extract notes
@@ -359,7 +357,7 @@ export function DocumentViewer({
     }
   };
 
-  const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
+  const processProvisionXML = (body: Element): string => {
     const clone = body.cloneNode(true) as Element;
     
     // Remove XML attributes that shouldn't be displayed
