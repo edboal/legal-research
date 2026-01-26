@@ -90,7 +90,7 @@ export const legislationAPI = {
 
       // Get link (use 'alternate' rel for HTML view)
       const linkEl = entry.querySelector('link[rel="alternate"][type="text/html"]');
-      const url = linkEl?.getAttribute('href') || '';
+      let url = linkEl?.getAttribute('href') || '';
 
       // Get summary/snippet
       const summaryEl = entry.querySelector('summary');
@@ -101,9 +101,17 @@ export const legislationAPI = {
       const updated = updatedEl?.textContent?.trim() || '';
 
       if (title && url) {
+        // Ensure URL starts with https://
+        if (url.startsWith('http://')) {
+          url = url.replace('http://', 'https://');
+        }
+        if (!url.startsWith('http')) {
+          url = `${LEGISLATION_BASE}${url}`;
+        }
+        
         results.push({
           title,
-          url: url.startsWith('http') ? url : `${LEGISLATION_BASE}${url}`,
+          url,
           snippet: snippet || `Last updated: ${updated}`,
           source: 'legislation' as const,
         });
