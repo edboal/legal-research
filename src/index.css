@@ -34,6 +34,7 @@
   font-size: 17px;
   line-height: 1.9;
   text-align: left;
+  text-align: left;
 }
 
 /* Part and Chapter - ONLY THESE ARE CENTERED */
@@ -186,7 +187,7 @@
   font-size: 20px;
   margin: 1.5rem 0 1rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-align: left;
+  text-align: left !important;
 }
 
 /* Pblock */
