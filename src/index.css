@@ -23,6 +23,16 @@
   overflow: hidden;
 }
 
+/* Performance optimizations */
+.legislation-content {
+  /* Use GPU acceleration for smooth scrolling */
+  transform: translateZ(0);
+  will-change: scroll-position;
+  
+  /* Contain layout changes */
+  contain: layout style paint;
+}
+
 /* Enhanced legislation content styling */
 .legislation-content {
   @apply text-iron-grey;
@@ -33,15 +43,19 @@
 .legislation-content h1,
 .legislation-content h2,
 .legislation-content h3,
-.legislation-content h4 {
+.legislation-content h4,
+.legislation-content .LegHeading,
+.legislation-content .LegP1GroupTitle {
   @apply text-iron-grey font-bold mt-6 mb-3;
+  scroll-margin-top: 2rem; /* Space when scrolling to anchor */
 }
 
 .legislation-content h1 {
   @apply text-2xl;
 }
 
-.legislation-content h2 {
+.legislation-content h2,
+.legislation-content .LegP1GroupTitle {
   @apply text-xl;
 }
 
@@ -49,6 +63,26 @@
   @apply text-lg;
 }
 
+/* Legislation-specific elements */
+.legislation-content .LegP1,
+.legislation-content .LegP2,
+.legislation-content .LegP3 {
+  @apply mb-4;
+}
+
+.legislation-content .LegP1Para,
+.legislation-content .LegP2Para,
+.legislation-content .LegP3Para {
+  @apply my-2;
+}
+
+/* Section numbers */
+.legislation-content .LegArticleRef,
+.legislation-content .LegSectionNo {
+  @apply font-bold text-iron-grey mr-2;
+}
+
+/* Links */
 .legislation-content a {
   @apply text-cool-steel underline hover:text-iron-grey;
   text-decoration-thickness: 1px;
@@ -73,6 +107,7 @@
   @apply mb-2;
 }
 
+/* Tables */
 .legislation-content table {
   @apply w-full border-collapse my-4;
 }
@@ -89,10 +124,32 @@
   @apply border-l-4 border-cool-steel pl-4 my-4 italic text-dim-grey;
 }
 
-/* Scrollbar styling */
+/* Indentation for nested provisions */
+.legislation-content .LegLevel1 {
+  @apply pl-0;
+}
+
+.legislation-content .LegLevel2 {
+  @apply pl-6;
+}
+
+.legislation-content .LegLevel3 {
+  @apply pl-12;
+}
+
+/* Definitions and cross-references */
+.legislation-content .LegDefinition {
+  @apply font-semibold;
+}
+
+.legislation-content .LegCrossRef {
+  @apply text-cool-steel;
+}
+
+/* Scrollbar styling - thinner for better performance */
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -116,4 +173,22 @@
 *:focus-visible {
   outline: 2px solid theme('colors.cool-steel');
   outline-offset: 2px;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Loading optimization - prevent flash of unstyled content */
+.legislation-content img {
+  max-width: 100%;
+  height: auto;
+  loading: lazy;
+}
+
+/* Reduce repaints during scroll */
+.legislation-content * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
