@@ -25,7 +25,6 @@
 
 /* ========================================
    PROFESSIONAL LEGAL DOCUMENT FORMATTING
-   Sans-serif headings, serif body
    ======================================== */
 
 .legislation-provision {
@@ -33,13 +32,9 @@
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 17px;
   line-height: 1.9;
-  max-width: 100%;
 }
 
-/* ========================================
-   SECTION NUMBERS - Bold, prominent
-   ======================================== */
-
+/* Section Numbers */
 .legislation-provision .LegP1No,
 .legislation-provision .LegSectionNo,
 .legislation-provision .LegArticleRef {
@@ -52,13 +47,11 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ========================================
-   HEADINGS - Sans-serif, clean, modern
-   ======================================== */
-
+/* Headings - Sans-serif */
 .legislation-provision h1,
 .legislation-provision .LegP1GroupTitle,
-.legislation-provision .LegHeading {
+.legislation-provision .LegHeading,
+.legislation-provision .LegPartTitle {
   color: #0f172a;
   font-weight: 700;
   font-size: 24px;
@@ -75,7 +68,6 @@
   font-size: 20px;
   margin: 1.75rem 0 1rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.4;
 }
 
 .legislation-provision h3 {
@@ -84,46 +76,28 @@
   font-size: 18px;
   margin: 1.5rem 0 0.75rem 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.4;
 }
 
-.legislation-provision h4 {
-  color: #1e293b;
-  font-weight: 600;
-  font-size: 17px;
-  margin: 1rem 0 0.5rem 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.4;
-}
-
-/* ========================================
-   CONTAINERS - Ensure all content is visible
-   ======================================== */
-
+/* Containers - Ensure visibility */
 .legislation-provision .LegP1Container,
 .legislation-provision .LegP1Group,
 .legislation-provision .LegP1,
-.legislation-provision .LegClearFix {
+.legislation-provision .LegPart,
+.legislation-provision .LegChapter {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   margin-bottom: 2rem;
-  padding: 0;
 }
 
-/* ========================================
-   PARAGRAPHS - Clear hierarchy
-   ======================================== */
-
-/* Level 1 - Main provisions */
+/* Paragraphs */
 .legislation-provision .LegP1Para,
 .legislation-provision .LegText {
   margin-bottom: 1rem;
   color: #1e293b;
-  display: block;
 }
 
-/* Level 2 - Sub-provisions */
+/* Level 2 Sub-provisions */
 .legislation-provision .LegP2Container,
 .legislation-provision .LegP2 {
   margin-left: 2.5rem;
@@ -142,13 +116,9 @@
   font-weight: 600;
   color: #0f172a;
   font-size: 17px;
-  display: inline-block;
-  min-width: 2.5rem;
-  margin-right: 0.5rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* Level 3 - Sub-sub-provisions */
+/* Level 3 Sub-sub-provisions */
 .legislation-provision .LegP3Container,
 .legislation-provision .LegP3 {
   margin-left: 5rem;
@@ -158,100 +128,22 @@
   padding-left: 1rem;
 }
 
-.legislation-provision .LegP3Para {
-  margin-bottom: 0.5rem;
-  color: #1e293b;
-}
-
-.legislation-provision .LegP3No {
-  font-weight: 500;
-  color: #1e293b;
-  font-size: 16px;
-  display: inline-block;
-  min-width: 2rem;
-  margin-right: 0.5rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-/* Level 4 - Further sub-provisions */
-.legislation-provision .LegP4Container,
-.legislation-provision .LegP4 {
-  margin-left: 7rem;
-  margin-bottom: 0.75rem;
-}
-
-.legislation-provision .LegP4Para {
-  color: #1e293b;
-}
-
-.legislation-provision .LegP4No {
-  font-weight: 500;
-  color: #1e293b;
-  display: inline-block;
-  min-width: 1.5rem;
-  margin-right: 0.5rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-/* ========================================
-   TEXT FORMATTING
-   ======================================== */
-
-.legislation-provision p {
-  color: #1e293b;
-  margin-bottom: 1rem;
-}
-
-.legislation-provision strong,
-.legislation-provision b {
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.legislation-provision em,
-.legislation-provision i {
-  font-style: italic;
-  color: #334155;
-}
-
-/* ========================================
-   DEFINITIONS & REFERENCES
-   ======================================== */
-
-.legislation-provision .LegDefinition {
-  font-weight: 600;
-  color: #0f172a;
-  border-bottom: 2px dotted #4c5760;
-  padding-bottom: 1px;
-}
-
-.legislation-provision .LegCrossRef,
+/* Links */
 .legislation-provision a {
   color: #4c5760;
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
-  font-weight: 500;
 }
 
-.legislation-provision .LegCrossRef:hover,
 .legislation-provision a:hover {
-  color: #0f172a;
+  color: #cd7f32; /* Bronze */
   text-decoration-thickness: 3px;
 }
 
-/* ========================================
-   LISTS
-   ======================================== */
-
-.legislation-provision ul {
-  list-style-type: disc;
-  margin-left: 2.5rem;
-  margin-bottom: 1.5rem;
-}
-
+/* Lists */
+.legislation-provision ul,
 .legislation-provision ol {
-  list-style-type: lower-alpha;
   margin-left: 2.5rem;
   margin-bottom: 1.5rem;
 }
@@ -262,21 +154,12 @@
   color: #1e293b;
 }
 
-.legislation-provision li::marker {
-  color: #4c5760;
-  font-weight: 600;
-}
-
-/* ========================================
-   TABLES
-   ======================================== */
-
+/* Tables */
 .legislation-provision table {
   width: 100%;
   border-collapse: collapse;
   margin: 2rem 0;
   border: 2px solid #4c5760;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .legislation-provision th {
@@ -284,7 +167,6 @@
   color: #ffffff;
   font-weight: 700;
   padding: 1rem;
-  border: 1px solid #66635b;
   text-align: left;
 }
 
@@ -298,80 +180,7 @@
   background: #f8f9fa;
 }
 
-.legislation-provision tbody tr:hover {
-  background: #e9ecef;
-}
-
-/* ========================================
-   SCHEDULES & APPENDICES
-   ======================================== */
-
-.legislation-provision .LegSchedule {
-  margin-top: 4rem;
-  padding-top: 2.5rem;
-  border-top: 4px solid #4c5760;
-}
-
-.legislation-provision .LegScheduleTitle {
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 24px;
-  margin-bottom: 2rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-/* ========================================
-   QUOTES & CITATIONS
-   ======================================== */
-
-.legislation-provision blockquote {
-  border-left: 5px solid #93a8ac;
-  padding-left: 2rem;
-  margin: 1.5rem 0;
-  font-style: italic;
-  color: #334155;
-  background: #f8fafc;
-  padding: 1rem 1rem 1rem 2rem;
-  border-radius: 0 4px 4px 0;
-}
-
-/* ========================================
-   AMENDMENTS
-   ======================================== */
-
-.legislation-provision .LegAmendment {
-  background: #e0f2fe;
-  padding: 1.25rem;
-  margin: 1.5rem 0;
-  border-left: 5px solid #0ea5e9;
-  border-radius: 4px;
-}
-
-.legislation-provision .LegInserted {
-  background: #dcfce7;
-  border-bottom: 3px solid #16a34a;
-  padding: 2px 4px;
-}
-
-.legislation-provision .LegRepealed {
-  text-decoration: line-through;
-  color: #94a3b8;
-  opacity: 0.6;
-}
-
-/* ========================================
-   PERFORMANCE
-   ======================================== */
-
-.legislation-provision {
-  transform: translateZ(0);
-  contain: layout style;
-}
-
-/* ========================================
-   SCROLLBAR
-   ======================================== */
-
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 14px;
   height: 14px;
@@ -389,24 +198,18 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4c5760;
+  background: #cd7f32; /* Bronze */
 }
 
-/* ========================================
-   SELECTION
-   ======================================== */
-
+/* Selection */
 ::selection {
-  background: #93a8ac;
+  background: #cd7f32;
   color: #ffffff;
 }
 
-/* ========================================
-   FOCUS
-   ======================================== */
-
+/* Focus */
 *:focus-visible {
-  outline: 3px solid #4c5760;
+  outline: 3px solid #cd7f32;
   outline-offset: 3px;
 }
 
