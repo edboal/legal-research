@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
-         ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+         ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
+         StickyNote, FileText } from 'lucide-react';
 import type { Document as LegislationDocument, Folder, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -24,6 +25,20 @@ interface TOCItem {
   level: number;
 }
 
+interface NoteItem {
+  id: string;
+  provisionId: string;
+  provisionTitle: string;
+  text: string;
+}
+
+interface StatusInfo {
+  label: string;
+  color: string;
+  icon: any;
+  tooltip: string;
+}
+
 const HIGHLIGHT_COLORS = [
   { name: 'Yellow', color: '#fef08a', border: '#fde047' },
   { name: 'Green', color: '#bbf7d0', border: '#86efac' },
@@ -41,22 +56,25 @@ export function DocumentViewer({
 }: DocumentViewerProps) {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [notesSearchQuery, setNotesSearchQuery] = useState('');
   const [tableOfContents, setTableOfContents] = useState<TOCItem[]>([]);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [selectedProvision, setSelectedProvision] = useState<TOCItem | null>(null);
   const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
   const [provisionContent, setProvisionContent] = useState<string>('');
+  const [allNotes, setAllNotes] = useState<NoteItem[]>([]);
   const [loadingTOC, setLoadingTOC] = useState(false);
   const [loadingProvision, setLoadingProvision] = useState(false);
-  const [tocWidth, setTocWidth] = useState(384); // 96 * 4 = 384px (w-96)
+  const [tocWidth, setTocWidth] = useState(384);
   const [isResizing, setIsResizing] = useState(false);
   const [tocCollapsed, setTocCollapsed] = useState(false);
   const [highlightMode, setHighlightMode] = useState(false);
   const [selectedHighlightColor, setSelectedHighlightColor] = useState(0);
+  const [documentStatus, setDocumentStatus] = useState<StatusInfo | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const resizeRef = useRef<HTMLDivElement>(null);
 
   // Resizing logic
   useEffect(() => {
@@ -83,7 +101,6 @@ export function DocumentViewer({
     };
   }, [isResizing]);
 
-  // Get flat list of all provisions for navigation
   const flatProvisions = useMemo(() => {
     const flatten = (items: TOCItem[]): TOCItem[] => {
       return items.reduce((acc: TOCItem[], item) => {
@@ -97,7 +114,7 @@ export function DocumentViewer({
     return flatten(tableOfContents);
   }, [tableOfContents]);
 
-  // Fetch Table of Contents
+  // Fetch Table of Contents and status
   useEffect(() => {
     if (!document) return;
 
@@ -116,10 +133,13 @@ export function DocumentViewer({
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         
+        // Extract status from metadata
+        const metadata = xmlDoc.querySelector('Metadata');
+        const status = extractStatusFromMetadata(metadata);
+        setDocumentStatus(status);
+        
         const toc = parseTOCFromXML(xmlDoc);
         setTableOfContents(toc);
-        
-        // Start collapsed
         setExpandedItems(new Set());
         
       } catch (error) {
@@ -132,6 +152,59 @@ export function DocumentViewer({
 
     fetchTOC();
   }, [document?.id]);
+
+  const extractStatusFromMetadata = (metadata: Element | null): StatusInfo => {
+    if (!metadata) {
+      return {
+        label: 'Unknown',
+        color: 'bg-gray-200 text-gray-700',
+        icon: AlertCircle,
+        tooltip: 'Status information not available.'
+      };
+    }
+
+    // Check for version info
+    const documentMainType = metadata.querySelector('DocumentMainType');
+    const year = metadata.querySelector('Year');
+    const enacted = metadata.querySelector('EnactmentDate, Made');
+    const modified = metadata.querySelector('Modified');
+    
+    // Check if it's an enacted version
+    const isEnacted = document?.url.toLowerCase().includes('/enacted');
+    
+    // Check for modifications/amendments
+    const hasModifications = metadata.querySelector('UnappliedEffects Effect');
+    
+    if (isEnacted) {
+      return {
+        label: 'As Enacted',
+        color: 'bg-status-green/20 text-status-green',
+        icon: CheckCircle,
+        tooltip: `This is the original version as ${enacted ? 'enacted on ' + enacted.textContent : 'initially made'}.`
+      };
+    } else if (hasModifications) {
+      return {
+        label: 'Revised (Changes Pending)',
+        color: 'bg-status-amber/20 text-status-amber',
+        icon: AlertTriangle,
+        tooltip: 'This version includes applied changes but has outstanding modifications not yet incorporated.'
+      };
+    } else if (modified) {
+      return {
+        label: 'Revised',
+        color: 'bg-status-blue/20 text-status-blue',
+        icon: CheckCircle,
+        tooltip: 'This is the revised version incorporating all known amendments.'
+      };
+    } else {
+      return {
+        label: 'Latest Available',
+        color: 'bg-status-blue/20 text-status-blue',
+        icon: AlertCircle,
+        tooltip: 'This is the latest available version of this legislation.'
+      };
+    }
+  };
 
   const parseTOCFromXML = (xmlDoc: XMLDocument): TOCItem[] => {
     const items: TOCItem[] = [];
@@ -262,10 +335,12 @@ export function DocumentViewer({
       
       const body = xmlDoc.querySelector('Body, Schedules');
       if (body) {
-        // Convert XML to HTML preserving structure
-        const serializer = new XMLSerializer();
-        const xmlString = serializer.serializeToString(body);
-        setProvisionContent(xmlString);
+        // Process the XML to handle links and clean up
+        const processedContent = processProvisionXML(body, xmlDoc);
+        setProvisionContent(processedContent);
+        
+        // Extract notes
+        extractNotes(xmlDoc, item);
       } else {
         setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
       }
@@ -281,6 +356,85 @@ export function DocumentViewer({
     } finally {
       setLoadingProvision(false);
       scrollToTop();
+    }
+  };
+
+  const processProvisionXML = (body: Element, xmlDoc: XMLDocument): string => {
+    const clone = body.cloneNode(true) as Element;
+    
+    // Remove XML attributes that shouldn't be displayed
+    const elementsWithAttrs = clone.querySelectorAll('[ChangeId], [CommentaryRef]');
+    elementsWithAttrs.forEach(el => {
+      el.removeAttribute('ChangeId');
+      el.removeAttribute('CommentaryRef');
+    });
+    
+    // Process internal references to make them clickable
+    const references = clone.querySelectorAll('Reference, InternalLink, Citation');
+    references.forEach((ref: Element) => {
+      const href = ref.getAttribute('URI') || ref.getAttribute('Ref');
+      if (href) {
+        const anchor = window.document.createElement('a');
+        anchor.textContent = ref.textContent || '';
+        anchor.href = '#';
+        anchor.className = 'internal-link';
+        anchor.setAttribute('data-ref', href);
+        anchor.onclick = (e) => {
+          e.preventDefault();
+          handleInternalLink(href);
+        };
+        ref.parentNode?.replaceChild(anchor, ref);
+      }
+    });
+    
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(clone);
+  };
+
+  const handleInternalLink = (href: string) => {
+    // Extract section reference and try to find it in TOC
+    const sectionMatch = href.match(/section-(\d+)|article-(\d+)|regulation-(\d+)/i);
+    if (sectionMatch) {
+      const sectionNum = sectionMatch[1] || sectionMatch[2] || sectionMatch[3];
+      const provision = flatProvisions.find(p => 
+        p.number === sectionNum || p.id.includes(sectionNum)
+      );
+      if (provision) {
+        const idx = flatProvisions.indexOf(provision);
+        fetchProvision(provision, idx);
+      }
+    }
+  };
+
+  const extractNotes = (xmlDoc: XMLDocument, provision: TOCItem) => {
+    const notes = xmlDoc.querySelectorAll('CommentaryRef, FootnoteRef, MarginNoteRef');
+    const noteItems: NoteItem[] = [];
+    
+    notes.forEach((note: Element, idx: number) => {
+      const noteText = note.textContent || '';
+      const noteRef = note.getAttribute('Ref') || '';
+      
+      // Find the actual note content
+      const commentary = xmlDoc.querySelector(`Commentary[id="${noteRef}"]`);
+      const footnote = xmlDoc.querySelector(`Footnote[id="${noteRef}"]`);
+      const actualNote = commentary || footnote;
+      
+      if (actualNote) {
+        noteItems.push({
+          id: `note-${provision.id}-${idx}`,
+          provisionId: provision.id,
+          provisionTitle: `${provision.number} ${provision.title}`,
+          text: actualNote.textContent || noteText
+        });
+      }
+    });
+    
+    if (noteItems.length > 0) {
+      setAllNotes(prev => {
+        // Remove old notes for this provision
+        const filtered = prev.filter(n => n.provisionId !== provision.id);
+        return [...filtered, ...noteItems];
+      });
     }
   };
 
@@ -326,6 +480,15 @@ export function DocumentViewer({
     return filterItems(tableOfContents);
   }, [tableOfContents, searchQuery]);
 
+  const filteredNotes = useMemo(() => {
+    if (!notesSearchQuery.trim()) return allNotes;
+    const query = notesSearchQuery.toLowerCase();
+    return allNotes.filter(note => 
+      note.text.toLowerCase().includes(query) ||
+      note.provisionTitle.toLowerCase().includes(query)
+    );
+  }, [allNotes, notesSearchQuery]);
+
   const handleTextSelection = () => {
     if (!highlightMode) return;
 
@@ -337,10 +500,11 @@ export function DocumentViewer({
     const color = HIGHLIGHT_COLORS[selectedHighlightColor];
     span.style.backgroundColor = color.color;
     span.style.borderBottom = `2px solid ${color.border}`;
-    span.style.cursor = 'pointer';
-    span.title = 'Click to remove highlight';
+    span.className = 'user-highlight';
+    span.setAttribute('data-highlight-color', selectedHighlightColor.toString());
     
-    span.onclick = () => {
+    span.onclick = (e) => {
+      e.stopPropagation();
       const parent = span.parentNode;
       if (parent) {
         const text = window.document.createTextNode(span.textContent || '');
@@ -356,37 +520,7 @@ export function DocumentViewer({
     }
   };
 
-  const getDocumentStatus = () => {
-    if (!document) return null;
-    
-    const url = document.url.toLowerCase();
-    
-    if (url.includes('/enacted')) {
-      return {
-        label: 'As Enacted',
-        color: 'bg-status-green/20 text-status-green',
-        icon: CheckCircle,
-        tooltip: 'Original version as enacted.'
-      };
-    } else if (url.includes('/data.htm') || /\/\d{4}-\d{2}-\d{2}/.test(url)) {
-      return {
-        label: 'Revised',
-        color: 'bg-status-amber/20 text-status-amber',
-        icon: AlertTriangle,
-        tooltip: 'Revised with amendments.'
-      };
-    } else {
-      return {
-        label: 'Latest',
-        color: 'bg-status-blue/20 text-status-blue',
-        icon: AlertCircle,
-        tooltip: 'Latest available.'
-      };
-    }
-  };
-
-  const status = getDocumentStatus();
-  const StatusIcon = status?.icon || AlertCircle;
+  const StatusIcon = documentStatus?.icon || AlertCircle;
 
   const scrollToTop = () => {
     if (contentRef.current) {
@@ -496,14 +630,14 @@ export function DocumentViewer({
                 {document.title}
               </h1>
               
-              {status && (
+              {documentStatus && (
                 <div className="group relative">
-                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${status.color} text-xs font-semibold border-2 border-current`}>
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${documentStatus.color} text-xs font-semibold border-2 border-current`}>
                     <StatusIcon size={14} />
-                    <span>{status.label}</span>
+                    <span>{documentStatus.label}</span>
                   </div>
                   <div className="absolute left-0 top-full mt-2 w-72 bg-white border-2 border-iron-grey rounded-lg shadow-xl p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    <p className="text-sm text-iron-grey">{status.tooltip}</p>
+                    <p className="text-sm text-iron-grey">{documentStatus.tooltip}</p>
                   </div>
                 </div>
               )}
@@ -546,7 +680,6 @@ export function DocumentViewer({
               )}
             </div>
 
-            {/* Highlight Mode */}
             <div className="relative">
               <button 
                 onClick={() => setHighlightMode(!highlightMode)} 
@@ -573,6 +706,19 @@ export function DocumentViewer({
               )}
             </div>
 
+            <button 
+              onClick={() => setShowNotes(!showNotes)} 
+              className={`p-2 rounded-lg transition-all relative ${showNotes ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`}
+              title="Toggle notes"
+            >
+              <StickyNote size={18} />
+              {allNotes.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {allNotes.length}
+                </span>
+              )}
+            </button>
+
             <button onClick={() => setShowComments(!showComments)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative" title="Toggle comments">
               <MessageSquare size={18} />
               {document.comments.length > 0 && (
@@ -590,24 +736,23 @@ export function DocumentViewer({
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* TOC Panel - Resizable */}
         {!tocCollapsed && (
           <div 
             className="border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden relative"
             style={{ width: `${tocWidth}px`, minWidth: '200px', maxWidth: '600px' }}
           >
-            <div className="p-4 border-b border-dim-grey">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-iron-grey">Table of Contents</h2>
-                <button
-                  onClick={() => setTocCollapsed(true)}
-                  className="p-1 hover:bg-sand-dune rounded transition-colors"
-                  title="Hide table of contents"
-                >
-                  <PanelLeftClose size={18} className="text-dim-grey" />
-                </button>
-              </div>
-              
+            <div className="p-4 border-b border-dim-grey flex items-center justify-between">
+              <h2 className="text-lg font-bold text-iron-grey">Contents</h2>
+              <button
+                onClick={() => setTocCollapsed(true)}
+                className="p-1.5 hover:bg-sand-dune rounded transition-colors"
+                title="Hide table of contents"
+              >
+                <PanelLeftClose size={18} className="text-dim-grey" />
+              </button>
+            </div>
+
+            <div className="px-4 py-3 border-b border-dim-grey">
               <div className="relative">
                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search provisions..." className="w-full px-4 py-2 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30 text-sm" />
                 <Search className="absolute left-3 top-2.5 h-5 w-5 text-dim-grey" />
@@ -636,29 +781,26 @@ export function DocumentViewer({
               )}
             </div>
 
-            {/* Resize Handle */}
             <div
-              ref={resizeRef}
               className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-bronze transition-colors"
               onMouseDown={() => setIsResizing(true)}
             />
           </div>
         )}
 
-        {/* Show TOC Button */}
         {tocCollapsed && (
-          <button
-            onClick={() => setTocCollapsed(false)}
-            className="absolute top-20 left-4 z-10 p-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all shadow-lg"
-            title="Show table of contents"
-          >
-            <PanelLeftOpen size={20} />
-          </button>
+          <div className="border-r-2 border-dim-grey bg-white p-2">
+            <button
+              onClick={() => setTocCollapsed(false)}
+              className="p-2 hover:bg-sand-dune rounded-lg transition-colors"
+              title="Show table of contents"
+            >
+              <PanelLeftOpen size={20} className="text-iron-grey" />
+            </button>
+          </div>
         )}
 
-        {/* Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Navigation Bar */}
           {selectedProvision && (
             <div className="bg-sand-dune border-b-2 border-dim-grey px-6 py-3 flex items-center justify-between flex-shrink-0">
               <button
@@ -737,7 +879,45 @@ export function DocumentViewer({
           </div>
         </div>
 
-        {/* Comments Sidebar */}
+        {showNotes && (
+          <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
+            <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
+              <h2 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                <StickyNote size={18} />
+                Notes & Commentary ({allNotes.length})
+              </h2>
+              
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={notesSearchQuery} 
+                  onChange={(e) => setNotesSearchQuery(e.target.value)} 
+                  placeholder="Search notes..." 
+                  className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {filteredNotes.length === 0 ? (
+                <div className="text-center text-dim-grey/60 py-8 italic text-sm">
+                  {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes in this provision'}
+                </div>
+              ) : (
+                filteredNotes.map(note => (
+                  <div key={note.id} className="p-3 bg-white rounded-lg border border-bronze/30 shadow-sm">
+                    <div className="text-xs font-semibold text-bronze mb-1">
+                      {note.provisionTitle}
+                    </div>
+                    <div className="text-sm text-iron-grey leading-relaxed">{note.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {showComments && (
           <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
             <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
