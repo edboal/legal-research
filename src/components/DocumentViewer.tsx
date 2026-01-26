@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Star, FolderInput, Trash2, MessageSquare, ExternalLink, 
+import { Star, FolderInput, Trash2, ExternalLink, 
          ChevronDown, ChevronRight, ArrowUp, Search, AlertCircle, 
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
@@ -386,7 +386,7 @@ export function DocumentViewer({
     }
   };
 
-  const extractAmendments = (xmlDoc: XMLDocument, provision: TOCItem) => {
+  const extractAmendments = (xmlDoc: XMLDocument, _provision: TOCItem) => {
     const amendmentsList: Amendment[] = [];
     
     const commentaryRefs = xmlDoc.querySelectorAll('CommentaryRef');
