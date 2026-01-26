@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, ChevronLeft, ChevronRight, FileText, List, BookOpen } from 'lucide-react';
+import { Star, FolderInput, Trash2, MessageSquare, Highlighter, ExternalLink, ChevronLeft, ChevronRight, FileText, List, BookOpen, ArrowUp, Loader } from 'lucide-react';
 import type { Document, Folder, Highlight, Comment } from '../types';
 
 interface DocumentViewerProps {
@@ -8,7 +8,6 @@ interface DocumentViewerProps {
   onToggleFavorite: (documentId: string) => void;
   onMoveToFolder: (documentId: string, folderId: string | null) => void;
   onDelete: (documentId: string) => void;
-  onAddHighlight: (documentId: string, highlight: Highlight) => void;
   onAddComment: (documentId: string, comment: Comment) => void;
 }
 
@@ -35,6 +34,7 @@ export function DocumentViewer({
   const [highlightMode, setHighlightMode] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('toc');
   const [currentProvisionIndex, setCurrentProvisionIndex] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Parse document into provisions
   const provisions = useMemo(() => {
@@ -44,9 +44,9 @@ export function DocumentViewer({
     const doc = parser.parseFromString(document.content, 'text/html');
     const provisionsList: Provision[] = [];
     
-    // Find all major provisions (sections, articles, regulations, etc.)
+    // Find all major provisions
     const provisionElements = doc.querySelectorAll(
-      '.LegP1Container, .LegP1Group, section, article'
+      '.LegP1Container, .LegP1Group, .LegClearFix, section, article'
     );
     
     if (provisionElements.length > 0) {
@@ -55,11 +55,12 @@ export function DocumentViewer({
         const numberEl = element.querySelector('.LegP1No, .LegSectionNo, .number');
         const number = numberEl?.textContent?.trim() || `${index + 1}`;
         
-        // Get title/heading
+        // Get title/heading - remove "U.K." suffix
         const titleEl = element.querySelector('.LegP1GroupTitle, .LegHeading, h1, h2, h3, h4');
-        const title = titleEl?.textContent?.trim() || `Provision ${number}`;
+        let title = titleEl?.textContent?.trim() || `Provision ${number}`;
+        title = title.replace(/\s*U\.K\.\s*$/i, '').trim();
         
-        // Get full content including all paragraphs and sub-provisions
+        // Get full content
         const content = element.outerHTML;
         
         if (content && content.length > 100) {
@@ -73,18 +74,15 @@ export function DocumentViewer({
       });
     }
     
-    // Fallback: If no structured provisions found, split by headings
+    // Fallback: split by headings
     if (provisionsList.length === 0) {
-      const allContent = doc.body.innerHTML;
-      
-      // Try to split by h2 or h3 headings
       const headings = doc.querySelectorAll('h1, h2, h3, .LegHeading');
       
       if (headings.length > 0) {
         headings.forEach((heading, index) => {
-          const headingText = heading.textContent?.trim() || `Section ${index + 1}`;
+          let headingText = heading.textContent?.trim() || `Section ${index + 1}`;
+          headingText = headingText.replace(/\s*U\.K\.\s*$/i, '').trim();
           
-          // Collect content until next heading
           let contentHtml = heading.outerHTML;
           let nextElement = heading.nextElementSibling;
           
@@ -103,12 +101,12 @@ export function DocumentViewer({
           }
         });
       } else {
-        // Last resort: Show entire document as one provision
+        // Last resort: entire document
         provisionsList.push({
           id: 'full-document',
           title: 'Full Document',
           number: '1',
-          content: allContent
+          content: doc.body.innerHTML
         });
       }
     }
@@ -120,17 +118,35 @@ export function DocumentViewer({
   useEffect(() => {
     setCurrentProvisionIndex(0);
     setActiveTab('toc');
+    setIsProcessing(false);
   }, [document?.id]);
+
+  // Scroll to top function
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (!document) {
     return (
       <div className="h-full flex items-center justify-center bg-sand-dune">
         <div className="text-center px-8">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-khaki-beige flex items-center justify-center">
-            <span className="text-4xl text-dim-grey">§</span>
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-cool-steel/20 flex items-center justify-center">
+            <span className="text-4xl text-iron-grey">§</span>
           </div>
           <p className="text-xl font-semibold text-iron-grey mb-2">No Document Selected</p>
           <p className="text-sm text-dim-grey">Search for legislation or browse your saved documents</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while processing
+  if (isProcessing) {
+    return (
+      <div className="h-full flex items-center justify-center bg-sand-dune">
+        <div className="text-center px-8">
+          <Loader className="w-12 h-12 mx-auto mb-4 text-iron-grey animate-spin" />
+          <p className="text-lg font-semibold text-iron-grey">Loading document...</p>
         </div>
       </div>
     );
@@ -157,22 +173,32 @@ export function DocumentViewer({
   const goToProvision = (index: number) => {
     setCurrentProvisionIndex(index);
     setActiveTab('content');
+    scrollToTop();
   };
 
   return (
-    <div className="h-full flex flex-col bg-sand-dune">
+    <div className="h-full flex flex-col bg-sand-dune relative">
+      {/* Scroll to Top Button */}
+      <button
+        onClick={scrollToTop}
+        className="fixed bottom-8 right-8 w-12 h-12 bg-iron-grey text-white rounded-full shadow-lg hover:bg-dim-grey transition-all z-50 flex items-center justify-center"
+        title="Scroll to top"
+      >
+        <ArrowUp size={24} />
+      </button>
+
       {/* Document Header */}
       <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-sand-dune mb-2 leading-tight">
+            <h1 className="text-lg font-bold text-white mb-2 leading-tight">
               {document.title}
             </h1>
             <a
               href={document.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-cool-steel hover:text-sand-dune flex items-center gap-1 w-fit"
+              className="text-sm text-cool-steel hover:text-white flex items-center gap-1 w-fit"
             >
               <ExternalLink size={14} />
               <span className="truncate">View on legislation.gov.uk</span>
@@ -185,8 +211,8 @@ export function DocumentViewer({
               onClick={() => onToggleFavorite(document.id)}
               className={`p-2 rounded-lg transition-all ${
                 document.isFavorite 
-                  ? 'bg-sand-dune text-iron-grey' 
-                  : 'bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20'
+                  ? 'bg-white text-iron-grey' 
+                  : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
               }`}
               title="Toggle favorite"
             >
@@ -196,20 +222,20 @@ export function DocumentViewer({
             <div className="relative">
               <button
                 onClick={() => setShowFolderMenu(!showFolderMenu)}
-                className="p-2 bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20 rounded-lg transition-all"
+                className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all"
                 title="Move to folder"
               >
                 <FolderInput size={18} />
               </button>
 
               {showFolderMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-sand-dune border-2 border-dim-grey rounded-lg shadow-xl z-10 overflow-hidden max-h-64 overflow-y-auto">
+                <div className="absolute right-0 mt-2 w-56 bg-white border-2 border-dim-grey rounded-lg shadow-xl z-10 overflow-hidden max-h-64 overflow-y-auto">
                   <button
                     onClick={() => {
                       onMoveToFolder(document.id, null);
                       setShowFolderMenu(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-cool-steel/20 font-medium"
+                    className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-sand-dune font-medium"
                   >
                     Unfiled
                   </button>
@@ -220,7 +246,7 @@ export function DocumentViewer({
                         onMoveToFolder(document.id, folder.id);
                         setShowFolderMenu(false);
                       }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-cool-steel/20 font-medium border-t border-dim-grey/20"
+                      className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-sand-dune font-medium border-t border-dim-grey/20"
                     >
                       {folder.name}
                     </button>
@@ -233,8 +259,8 @@ export function DocumentViewer({
               onClick={() => setHighlightMode(!highlightMode)}
               className={`p-2 rounded-lg transition-all relative ${
                 highlightMode 
-                  ? 'bg-cool-steel text-iron-grey' 
-                  : 'bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20'
+                  ? 'bg-white text-iron-grey' 
+                  : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
               }`}
               title="Highlight mode"
             >
@@ -243,12 +269,12 @@ export function DocumentViewer({
 
             <button
               onClick={() => setShowComments(!showComments)}
-              className="p-2 bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20 rounded-lg transition-all relative"
+              className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all relative"
               title="Toggle comments"
             >
               <MessageSquare size={18} />
               {document.comments.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-cool-steel text-iron-grey text-xs font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-cool-steel text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {document.comments.length}
                 </span>
               )}
@@ -256,7 +282,7 @@ export function DocumentViewer({
 
             <button
               onClick={() => onDelete(document.id)}
-              className="p-2 bg-dim-grey/20 text-sand-dune hover:bg-red-600 hover:text-white rounded-lg transition-all"
+              className="p-2 bg-dim-grey text-white hover:bg-red-600 rounded-lg transition-all"
               title="Delete document"
             >
               <Trash2 size={18} />
@@ -268,10 +294,10 @@ export function DocumentViewer({
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab('toc')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
               activeTab === 'toc'
-                ? 'bg-sand-dune text-iron-grey shadow'
-                : 'bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20'
+                ? 'bg-white text-iron-grey shadow-lg'
+                : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
             }`}
           >
             <List size={16} />
@@ -279,10 +305,10 @@ export function DocumentViewer({
           </button>
           <button
             onClick={() => setActiveTab('content')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
               activeTab === 'content'
-                ? 'bg-sand-dune text-iron-grey shadow'
-                : 'bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20'
+                ? 'bg-white text-iron-grey shadow-lg'
+                : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
             }`}
           >
             <FileText size={16} />
@@ -290,10 +316,10 @@ export function DocumentViewer({
           </button>
           <button
             onClick={() => setActiveTab('notes')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
               activeTab === 'notes'
-                ? 'bg-sand-dune text-iron-grey shadow'
-                : 'bg-dim-grey/20 text-sand-dune hover:bg-sand-dune/20'
+                ? 'bg-white text-iron-grey shadow-lg'
+                : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'
             }`}
           >
             <BookOpen size={16} />
@@ -314,10 +340,10 @@ export function DocumentViewer({
                   <button
                     key={provision.id}
                     onClick={() => goToProvision(index)}
-                    className="w-full text-left px-4 py-3 hover:bg-cool-steel/10 rounded-lg transition-colors group border border-transparent hover:border-cool-steel/30"
+                    className="w-full text-left px-4 py-3 hover:bg-sand-dune rounded-lg transition-colors group border border-transparent hover:border-iron-grey"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="font-bold text-cool-steel min-w-[3rem] text-right">
+                      <span className="font-bold text-iron-grey min-w-[3rem] text-right">
                         {provision.number}
                       </span>
                       <span className="text-iron-grey group-hover:text-dim-grey font-medium">
@@ -334,11 +360,14 @@ export function DocumentViewer({
           {activeTab === 'content' && currentProvision && (
             <div className="flex flex-col h-full">
               {/* Provision Navigation */}
-              <div className="bg-khaki-beige border-b-2 border-dim-grey px-8 py-4 flex items-center justify-between flex-shrink-0">
+              <div className="bg-sand-dune border-b-2 border-dim-grey px-8 py-4 flex items-center justify-between flex-shrink-0">
                 <button
-                  onClick={() => setCurrentProvisionIndex(currentProvisionIndex - 1)}
+                  onClick={() => {
+                    setCurrentProvisionIndex(currentProvisionIndex - 1);
+                    scrollToTop();
+                  }}
                   disabled={!hasPrevious}
-                  className="flex items-center gap-2 px-4 py-2 bg-cool-steel text-iron-grey rounded-lg hover:bg-iron-grey hover:text-sand-dune transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-cool-steel disabled:hover:text-iron-grey font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
                 >
                   <ChevronLeft size={18} />
                   Previous
@@ -354,9 +383,12 @@ export function DocumentViewer({
                 </div>
 
                 <button
-                  onClick={() => setCurrentProvisionIndex(currentProvisionIndex + 1)}
+                  onClick={() => {
+                    setCurrentProvisionIndex(currentProvisionIndex + 1);
+                    scrollToTop();
+                  }}
                   disabled={!hasNext}
-                  className="flex items-center gap-2 px-4 py-2 bg-cool-steel text-iron-grey rounded-lg hover:bg-iron-grey hover:text-sand-dune transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-cool-steel disabled:hover:text-iron-grey font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold"
                 >
                   Next
                   <ChevronRight size={18} />
@@ -379,8 +411,8 @@ export function DocumentViewer({
           {activeTab === 'notes' && (
             <div className="p-8 max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-iron-grey mb-6">Explanatory Notes</h2>
-              <div className="bg-khaki-beige/30 border-2 border-cool-steel/30 rounded-lg p-6">
-                <p className="text-dim-grey italic mb-4">
+              <div className="bg-sand-dune border-2 border-iron-grey/30 rounded-lg p-6">
+                <p className="text-iron-grey mb-4">
                   Explanatory notes are not currently available through the API.
                   You can view them directly on legislation.gov.uk.
                 </p>
@@ -388,7 +420,7 @@ export function DocumentViewer({
                   href={`${document.url.split('/data.htm')[0].replace(/\/\d{4}-\d{2}-\d{2}/, '')}/notes/contents`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-cool-steel text-iron-grey rounded-lg hover:bg-iron-grey hover:text-sand-dune transition-all font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-dim-grey transition-all font-semibold"
                 >
                   <ExternalLink size={16} />
                   View Explanatory Notes
@@ -400,9 +432,9 @@ export function DocumentViewer({
 
         {/* Comments Sidebar */}
         {showComments && (
-          <div className="w-80 border-l-2 border-dim-grey bg-khaki-beige flex flex-col shadow-lg overflow-hidden">
+          <div className="w-80 border-l-2 border-dim-grey bg-sand-dune flex flex-col shadow-lg overflow-hidden">
             <div className="p-4 bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
-              <h2 className="text-base font-bold text-sand-dune mb-4 flex items-center gap-2">
+              <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
                 <MessageSquare size={18} />
                 Comments ({document.comments.length})
               </h2>
@@ -412,13 +444,13 @@ export function DocumentViewer({
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..."
-                  className="w-full px-3 py-2.5 bg-sand-dune text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
+                  className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-cool-steel border border-dim-grey/30"
                   rows={3}
                 />
                 <button
                   onClick={handleAddComment}
                   disabled={!newComment.trim()}
-                  className="w-full bg-cool-steel text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-sand-dune transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-cool-steel hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add Comment
                 </button>
@@ -432,7 +464,7 @@ export function DocumentViewer({
                 </div>
               ) : (
                 document.comments.map(comment => (
-                  <div key={comment.id} className="p-3 bg-sand-dune rounded-lg border border-dim-grey/20 shadow-sm">
+                  <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
                     <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
                       {comment.timestamp.toLocaleDateString('en-GB', { 
                         day: 'numeric', 
