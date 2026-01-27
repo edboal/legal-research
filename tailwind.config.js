@@ -48,6 +48,16 @@ export default {
         'success': '#10b981',
         'warning': '#f59e0b',
         'error': '#ef4444',
+        
+        // Legacy color mappings for backwards compatibility
+        'sand-dune': '#1e293b',
+        'iron-grey': '#f1f5f9',
+        'bronze': '#d946ef',
+        'cool-steel': '#94a3b8',
+        'dim-grey': '#475569',
+        'status-green': '#10b981',
+        'status-amber': '#f59e0b',
+        'status-blue': '#6366f1',
       },
       fontFamily: {
         sans: ['Inter', 'SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
