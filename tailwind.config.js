@@ -7,18 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Modern Legal Tech Color Scheme
+        // Clean Minimalist Color Scheme
         'primary': {
-          50: '#f0f4ff',
-          100: '#e0e9ff',
-          200: '#c7d7fe',
-          300: '#a5bbfc',
-          400: '#8296f8',
-          500: '#6366f1', // Main purple-blue
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9', // Clean blue
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
         },
         'dark': {
           50: '#f8fafc',
@@ -33,31 +33,19 @@ export default {
           900: '#0f172a', // Darker
           950: '#020617', // Darkest
         },
-        'accent': {
-          50: '#fdf4ff',
-          100: '#fae8ff',
-          200: '#f5d0fe',
-          300: '#f0abfc',
-          400: '#e879f9',
-          500: '#d946ef', // Magenta accent
-          600: '#c026d3',
-          700: '#a21caf',
-          800: '#86198f',
-          900: '#701a75',
-        },
         'success': '#10b981',
         'warning': '#f59e0b',
         'error': '#ef4444',
         
         // Legacy color mappings for backwards compatibility
-        'sand-dune': '#1e293b',
-        'iron-grey': '#f1f5f9',
-        'bronze': '#d946ef',
-        'cool-steel': '#94a3b8',
-        'dim-grey': '#475569',
+        'sand-dune': '#f8fafc',
+        'iron-grey': '#1e293b',
+        'bronze': '#0ea5e9',
+        'cool-steel': '#64748b',
+        'dim-grey': '#cbd5e1',
         'status-green': '#10b981',
         'status-amber': '#f59e0b',
-        'status-blue': '#6366f1',
+        'status-blue': '#0ea5e9',
       },
       fontFamily: {
         sans: ['Inter', 'SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
