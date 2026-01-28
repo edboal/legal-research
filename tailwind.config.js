@@ -7,20 +7,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm Minimalist Color Scheme
+        // Optimized Readability Color Scheme
         'primary': {
-          50: '#fef7ee',
-          100: '#fdecd3',
-          200: '#fad6a5',
-          300: '#f7b96d',
-          400: '#f39333',
-          500: '#f07617', // Warm orange
-          600: '#e1590d',
-          700: '#bb420d',
-          800: '#953512',
-          900: '#792e12',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
         },
-        'dark': {
+        'neutral': {
           50: '#fafaf9',
           100: '#f5f5f4',
           200: '#e7e5e4',
@@ -29,36 +29,22 @@ export default {
           500: '#78716c',
           600: '#57534e',
           700: '#44403c',
-          800: '#292524', // Main dark brown
-          900: '#1c1917', // Darker brown
-          950: '#0c0a09', // Darkest
-        },
-        'cream': {
-          50: '#fefdfb',
-          100: '#fdfbf7',
-          200: '#faf6ed', // Light cream background
-          300: '#f5ede0',
-          400: '#ede1cc',
-          500: '#e4d3b8',
-          600: '#d1b894',
+          800: '#292524',
+          900: '#1c1917',
         },
         'success': '#059669',
-        'warning': '#f59e0b',
+        'warning': '#d97706',
         'error': '#dc2626',
         
-        // Legacy color mappings for backwards compatibility
-        'sand-dune': '#faf6ed', // Warm cream
-        'iron-grey': '#292524', // Warm dark
-        'bronze': '#f07617', // Warm orange
-        'cool-steel': '#78716c', // Warm gray
-        'dim-grey': '#d6d3d1', // Light warm gray
+        // Legacy mappings
+        'sand-dune': '#f5f5f4',
+        'iron-grey': '#292524',
+        'bronze': '#2563eb',
+        'cool-steel': '#78716c',
+        'dim-grey': '#d6d3d1',
         'status-green': '#059669',
-        'status-amber': '#f59e0b',
-        'status-blue': '#0284c7',
-      },
-      fontFamily: {
-        sans: ['Inter', 'SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        'status-amber': '#d97706',
+        'status-blue': '#2563eb',
       },
     },
   },
