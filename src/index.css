@@ -5,8 +5,8 @@
 @layer base {
   body {
     @apply m-0;
-    background: #f8fafc;
-    color: #1e293b;
+    background: #faf6ed;
+    color: #292524;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -24,7 +24,7 @@
    ======================================== */
 
 .legislation-provision {
-  color: #1e293b;
+  color: #292524;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 16px;
   line-height: 1.6;
@@ -32,7 +32,7 @@
   background: #ffffff;
   padding: 3rem;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e7e5e4;
 }
 
 /* PART NUMBERS - Large, centered, uppercase */
@@ -206,13 +206,13 @@
   border: none;
 }
 
-/* LINKS - Clean blue */
+/* LINKS - Warm orange-brown */
 .legislation-provision .internal-link,
 .legislation-provision Reference,
 .legislation-provision Citation,
 .legislation-provision InternalLink {
   display: inline;
-  color: #0284c7;
+  color: #e1590d;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
@@ -223,7 +223,7 @@
 .legislation-provision .internal-link:hover,
 .legislation-provision Reference:hover,
 .legislation-provision Citation:hover {
-  color: #0369a1;
+  color: #bb420d;
 }
 
 /* DEFINITION TERMS */
@@ -326,12 +326,12 @@
   width: 100%;
   text-align: left;
   padding: 0.75rem 1rem;
-  background: #f8fafc;
+  background: #fdfbf7;
   border: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e7e5e4;
   font-weight: 600;
   font-size: 14px;
-  color: #475569;
+  color: #57534e;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
@@ -341,13 +341,13 @@
 }
 
 .accordion-button:hover {
-  background: #f1f5f9;
+  background: #f5ede0;
 }
 
 .accordion-button.active {
-  background: #0ea5e9;
+  background: #f07617;
   color: white;
-  border-bottom-color: #0ea5e9;
+  border-bottom-color: #f07617;
 }
 
 .accordion-content {
@@ -357,7 +357,7 @@
   line-height: 1.6;
   text-align: left;
   font-family: Arial, sans-serif;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e7e5e4;
 }
 
 /* USER HIGHLIGHTS */
@@ -378,32 +378,32 @@
   display: none;
 }
 
-/* SCROLLBAR STYLING - Clean minimal */
+/* SCROLLBAR STYLING - Warm minimal */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #f5f5f4;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d6d3d1;
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a8a29e;
 }
 
 ::selection {
-  background: #bae6fd;
-  color: #0c4a6e;
+  background: #fad6a5;
+  color: #792e12;
 }
 
 *:focus-visible {
-  outline: 2px solid #0ea5e9;
+  outline: 2px solid #f07617;
   outline-offset: 2px;
 }
 
