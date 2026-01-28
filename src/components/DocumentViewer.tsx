@@ -71,6 +71,8 @@ export function DocumentViewer({
   const [outstandingChangesUrl, setOutstandingChangesUrl] = useState<string>('');
   const [relationshipsData, setRelationshipsData] = useState<any>(null);
   const [loadingRelationships, setLoadingRelationships] = useState(false);
+  const [displayTheme, setDisplayTheme] = useState<'light' | 'dark' | 'sepia'>('light');
+  const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -757,9 +759,9 @@ export function DocumentViewer({
             onClick={() => fetchProvision(item, globalIndex)}
             className="flex-1 min-w-0"
           >
-            <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="flex items-baseline gap-2">
               {item.number && (
-                <span className="font-bold text-iron-grey text-sm whitespace-nowrap">
+                <span className="font-bold text-iron-grey text-sm flex-shrink-0">
                   {item.number}
                 </span>
               )}
@@ -767,7 +769,7 @@ export function DocumentViewer({
                 {item.title}
               </span>
               {item.status && (
-                <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 flex-shrink-0">
                   {item.status}
                 </span>
               )}
@@ -1039,6 +1041,101 @@ export function DocumentViewer({
             </div>
           )}
 
+          {selectedProvision && (
+            <div className="bg-neutral-100 border-b border-neutral-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-medium text-neutral-600 uppercase tracking-wide">Display</span>
+                
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDisplayTheme('light')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                      displayTheme === 'light'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Light theme"
+                  >
+                    Light
+                  </button>
+                  <button
+                    onClick={() => setDisplayTheme('dark')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                      displayTheme === 'dark'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Dark theme"
+                  >
+                    Dark
+                  </button>
+                  <button
+                    onClick={() => setDisplayTheme('sepia')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                      displayTheme === 'sepia'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Sepia theme"
+                  >
+                    Sepia
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-medium text-neutral-600 uppercase tracking-wide">Font Size</span>
+                
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setFontSize('small')}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                      fontSize === 'small'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Small font"
+                  >
+                    A
+                  </button>
+                  <button
+                    onClick={() => setFontSize('medium')}
+                    className={`px-3 py-1 text-sm font-medium rounded transition-all ${
+                      fontSize === 'medium'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Medium font"
+                  >
+                    A
+                  </button>
+                  <button
+                    onClick={() => setFontSize('large')}
+                    className={`px-3 py-1 text-base font-medium rounded transition-all ${
+                      fontSize === 'large'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Large font"
+                  >
+                    A
+                  </button>
+                  <button
+                    onClick={() => setFontSize('xlarge')}
+                    className={`px-3 py-1 text-lg font-medium rounded transition-all ${
+                      fontSize === 'xlarge'
+                        ? 'bg-neutral-800 text-white'
+                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                    }`}
+                    title="Extra large font"
+                  >
+                    A
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div 
             ref={contentRef} 
             className="flex-1 overflow-y-auto bg-white"
@@ -1069,7 +1166,12 @@ export function DocumentViewer({
                   )}
                 </div>
                 
-                <div className="legislation-provision" dangerouslySetInnerHTML={{ __html: provisionContent }} />
+                <div 
+                  className="legislation-provision" 
+                  data-theme={displayTheme}
+                  data-font-size={fontSize}
+                  dangerouslySetInnerHTML={{ __html: provisionContent }} 
+                />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-center px-8">
