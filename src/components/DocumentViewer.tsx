@@ -4,7 +4,7 @@ import { Star, FolderInput, Trash2, ExternalLink,
          CheckCircle, AlertTriangle, Loader, ChevronLeft as PrevIcon, 
          ChevronRight as NextIcon, Highlighter, PanelLeftClose, PanelLeftOpen,
          StickyNote, X, Info } from 'lucide-react';
-import type { Document as LegislationDocument, Folder, Comment } from '../types';
+import type { Document as LegislationDocument, Folder, Comment, Highlight } from '../types';
 
 interface DocumentViewerProps {
   document: LegislationDocument | null;
@@ -718,10 +718,13 @@ export function DocumentViewer({
       if (onAddHighlight) {
         const highlight: Highlight = {
           id: highlightId,
-          position: currentProvisionIndex,
-          colorIndex: selectedHighlightColor,
-          text: range.toString(),
-          timestamp: new Date(),
+          range: {
+            start: 0, // Position in provision
+            end: range.toString().length
+          },
+          color: color.color,
+          note: '',
+          createdAt: new Date(),
         };
         onAddHighlight(document.id, highlight);
       }
