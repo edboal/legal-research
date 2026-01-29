@@ -25,7 +25,7 @@
 
 .legislation-provision {
   color: #292524;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
   font-size: 17px;
   line-height: 1.65;
   text-align: left;
@@ -107,14 +107,14 @@
   margin: 0.5rem 0 2.5rem 0;
 }
 
-/* P1GROUP - Title as header before sections */
+/* P1GROUP - Title inline with first provision */
 .legislation-provision P1group {
   display: block;
   margin: 2.5rem 0 0 0;
 }
 
 .legislation-provision P1group > Title {
-  display: block;
+  display: inline;
   font-style: italic;
   font-weight: 600;
   font-size: 15px;
@@ -122,9 +122,19 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e5e5e5;
+  margin-right: 1em;
+}
+
+/* Ensure first P1 in P1group stays inline with Title */
+.legislation-provision P1group > P1:first-of-type {
+  display: inline;
+  margin-bottom: 1.5rem;
+}
+
+/* Subsequent P1 elements in P1group are blocks */
+.legislation-provision P1group > P1:not(:first-of-type) {
+  display: block;
+  margin-bottom: 1.5rem;
 }
 
 /* SECTION NUMBERS - Keep with title, no line break */
