@@ -41,7 +41,7 @@ export default {
         'iron-grey': '#292524',
         'bronze': '#2563eb',
         'cool-steel': '#78716c',
-        'dim-grey': '#d6d3d1',
+        'dim-grey': '#292524',
         'status-green': '#059669',
         'status-amber': '#d97706',
         'status-blue': '#2563eb',
