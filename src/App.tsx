@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search } from './components/Search';
+import { Search, Menu, X } from 'lucide-react';
+import { Search as SearchComponent } from './components/Search';
 import { Sidebar } from './components/Sidebar';
 import { DocumentViewer } from './components/DocumentViewer';
-import type { AppState, Document, Folder, SearchResult, Comment } from './types';
+import type { AppState, Document, Folder, SearchResult, Highlight, Comment } from './types';
 import { storage } from './services/storage';
 import { legislationAPI } from './services/legislationAPI';
 
@@ -10,6 +11,7 @@ function App() {
   const [state, setState] = useState<AppState>(() => storage.load());
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   useEffect(() => {
     storage.save(state);
@@ -21,7 +23,6 @@ function App() {
     const existing = state.documents.find(d => d.url === result.url);
     if (existing) {
       setSelectedDocumentId(existing.id);
-      setShowSearch(false);
       return;
     }
 
@@ -46,7 +47,6 @@ function App() {
       const newState = storage.addDocument(state, newDocument);
       setState(newState);
       setSelectedDocumentId(newDocument.id);
-      setShowSearch(false);
     } catch (error) {
       console.error('Error loading document:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -90,31 +90,58 @@ function App() {
     }
   };
 
+  const handleAddHighlight = (documentId: string, highlight: Highlight) => {
+    const newState = storage.addHighlight(state, documentId, highlight);
+    setState(newState);
+  };
+
   const handleAddComment = (documentId: string, comment: Comment) => {
     const newState = storage.addComment(state, documentId, comment);
     setState(newState);
   };
 
   return (
-    <div className="h-screen flex flex-col bg-sand-dune">
+    <div className="h-screen flex flex-col bg-neutral-100">
       {/* Header */}
-      <header className="bg-iron-grey shadow-md px-6 py-4 border-b-2 border-dim-grey">
+      <header className="bg-neutral-800 border-b-2 border-neutral-700 px-6 py-4 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-cool-steel flex items-center justify-center">
-              <span className="text-iron-grey font-bold text-xl">§</span>
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-neutral-700 rounded-lg flex items-center justify-center">
+              <span className="text-2xl text-white font-bold">§</span>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">Legal Research</h1>
-              <p className="text-xs text-cool-steel">UK Legislation Database</p>
+              <h1 className="text-xl font-bold text-white">Legal Research Tool</h1>
+              <p className="text-sm text-neutral-100">UK Legislation Database</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            className="px-4 py-2 bg-white text-iron-grey font-semibold rounded-lg hover:bg-cool-steel hover:text-white transition-all text-sm shadow-sm hover:shadow"
-          >
-            {showSearch ? 'Hide Search' : 'Show Search'}
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className={`px-4 py-2 font-medium rounded-lg transition-all text-sm flex items-center gap-2 ${
+                showSearch
+                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                  : 'bg-neutral-700 text-neutral-200 hover:bg-neutral-600'
+              }`}
+              title={showSearch ? 'Hide search panel' : 'Show search panel'}
+            >
+              {showSearch ? <X size={16} /> : <Search size={16} />}
+              {showSearch ? 'Hide Search' : 'Search'}
+            </button>
+            
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className={`px-4 py-2 font-medium rounded-lg transition-all text-sm flex items-center gap-2 ${
+                showSidebar
+                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                  : 'bg-neutral-700 text-neutral-200 hover:bg-neutral-600'
+              }`}
+              title={showSidebar ? 'Hide favorites/folders' : 'Show favorites/folders'}
+            >
+              {showSidebar ? <X size={16} /> : <Menu size={16} />}
+              {showSidebar ? 'Hide Sidebar' : 'Sidebar'}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -122,24 +149,28 @@ function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Search Panel */}
         {showSearch && (
-          <div className="w-96 border-r-2 border-dim-grey shadow-lg">
-            <Search onSelectResult={handleSelectSearchResult} />
+          <div className="w-96 border-r-2 border-neutral-300 bg-white flex-shrink-0">
+            <SearchComponent onSelectResult={handleSelectSearchResult} />
           </div>
         )}
 
         {/* Sidebar */}
-        <Sidebar
-          folders={state.folders}
-          documents={state.documents}
-          selectedDocumentId={selectedDocumentId}
-          onSelectDocument={setSelectedDocumentId}
-          onCreateFolder={handleCreateFolder}
-          onDeleteFolder={handleDeleteFolder}
-          onMoveDocument={handleMoveDocument}
-        />
+        {showSidebar && (
+          <div className="flex-shrink-0">
+            <Sidebar
+              folders={state.folders}
+              documents={state.documents}
+              selectedDocumentId={selectedDocumentId}
+              onSelectDocument={setSelectedDocumentId}
+              onCreateFolder={handleCreateFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onMoveDocument={handleMoveDocument}
+            />
+          </div>
+        )}
 
         {/* Document Viewer */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <DocumentViewer
             document={selectedDocument}
             folders={state.folders}
@@ -147,6 +178,7 @@ function App() {
             onMoveToFolder={handleMoveDocument}
             onDelete={handleDeleteDocument}
             onAddComment={handleAddComment}
+            onAddHighlight={handleAddHighlight}
           />
         </div>
       </div>
