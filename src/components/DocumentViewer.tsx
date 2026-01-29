@@ -13,6 +13,7 @@ interface DocumentViewerProps {
   onMoveToFolder: (documentId: string, folderId: string | null) => void;
   onDelete: (documentId: string) => void;
   onAddComment: (documentId: string, comment: Comment) => void;
+  onAddHighlight?: (documentId: string, highlight: Highlight) => void;
 }
 
 interface TOCItem {
@@ -48,6 +49,7 @@ export function DocumentViewer({
   onMoveToFolder,
   onDelete,
   onAddComment,
+  onAddHighlight,
 }: DocumentViewerProps) {
   const [showFolderMenu, setShowFolderMenu] = useState(false);
   const [showCopyright, setShowCopyright] = useState(false);
@@ -504,7 +506,7 @@ export function DocumentViewer({
         const processedContent = processProvisionXML(body, xmlDoc);
         setProvisionContent(processedContent);
       } else {
-        setProvisionContent('<p class="text-dim-grey italic">Content not available</p>');
+        setProvisionContent('<p class="text-neutral-600 italic">Content not available</p>');
       }
       
     } catch (error) {
@@ -681,7 +683,7 @@ export function DocumentViewer({
   }, [document?.comments, notesSearchQuery]);
 
   const handleTextSelection = () => {
-    if (!highlightMode) return;
+    if (!highlightMode || !document) return;
 
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
@@ -692,20 +694,37 @@ export function DocumentViewer({
     span.style.backgroundColor = color.color;
     span.style.borderBottom = `2px solid ${color.border}`;
     span.className = 'user-highlight';
+    
+    const highlightId = crypto.randomUUID();
+    span.setAttribute('data-highlight-id', highlightId);
     span.setAttribute('data-highlight-color', selectedHighlightColor.toString());
     
     span.onclick = (e) => {
       e.stopPropagation();
-      const parent = span.parentNode;
-      if (parent) {
-        const text = window.document.createTextNode(span.textContent || '');
-        parent.replaceChild(text, span);
+      if (confirm('Remove this highlight?')) {
+        const parent = span.parentNode;
+        if (parent) {
+          const text = window.document.createTextNode(span.textContent || '');
+          parent.replaceChild(text, span);
+        }
       }
     };
 
     try {
       range.surroundContents(span);
       selection.removeAllRanges();
+      
+      // Save highlight persistently
+      if (onAddHighlight) {
+        const highlight: Highlight = {
+          id: highlightId,
+          position: currentProvisionIndex,
+          colorIndex: selectedHighlightColor,
+          text: range.toString(),
+          timestamp: new Date(),
+        };
+        onAddHighlight(document.id, highlight);
+      }
     } catch (e) {
       console.error('Could not highlight selection:', e);
     }
@@ -738,8 +757,8 @@ export function DocumentViewer({
     return (
       <div key={item.id}>
         <div 
-          className={`flex items-start gap-2 px-3 py-2 hover:bg-sand-dune rounded-lg cursor-pointer group ${
-            isSelected ? 'bg-bronze/20 border-l-4 border-bronze' : ''
+          className={`flex items-start gap-2 px-3 py-2 hover:bg-neutral-50 rounded-lg cursor-pointer group ${
+            isSelected ? 'bg-primary-600/20 border-l-4 border-bronze' : ''
           }`}
           style={{ paddingLeft: `${item.level * 1.5 + 0.75}rem` }}
         >
@@ -749,7 +768,7 @@ export function DocumentViewer({
                 e.stopPropagation();
                 toggleExpand(item.id);
               }}
-              className="mt-1 text-dim-grey hover:text-iron-grey flex-shrink-0"
+              className="mt-1 text-neutral-600 hover:text-neutral-800 flex-shrink-0"
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
@@ -761,11 +780,11 @@ export function DocumentViewer({
           >
             <div className="flex items-baseline gap-2">
               {item.number && (
-                <span className="font-bold text-iron-grey text-sm flex-shrink-0">
+                <span className="font-bold text-neutral-800 text-sm flex-shrink-0">
                   {item.number}
                 </span>
               )}
-              <span className="text-iron-grey text-sm group-hover:text-bronze">
+              <span className="text-neutral-800 text-sm group-hover:text-primary-600">
                 {item.title}
               </span>
               {item.status && (
@@ -791,23 +810,23 @@ export function DocumentViewer({
 
   if (!document) {
     return (
-      <div className="h-full flex items-center justify-center bg-sand-dune">
+      <div className="h-full flex items-center justify-center bg-neutral-50">
         <div className="text-center px-8">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-cool-steel/20 flex items-center justify-center">
-            <span className="text-4xl text-iron-grey">§</span>
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-neutral-700/20 flex items-center justify-center">
+            <span className="text-4xl text-neutral-800">§</span>
           </div>
-          <p className="text-xl font-semibold text-iron-grey mb-2">No Document Selected</p>
-          <p className="text-sm text-dim-grey">Search for legislation or browse your saved documents</p>
+          <p className="text-xl font-semibold text-neutral-800 mb-2">No Document Selected</p>
+          <p className="text-sm text-neutral-600">Search for legislation or browse your saved documents</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-sand-dune relative">
+    <div className="h-full flex flex-col bg-neutral-50 relative">
       <button
         onClick={scrollToTop}
-        className="fixed bottom-8 right-8 w-12 h-12 bg-iron-grey text-white rounded-full shadow-lg hover:bg-bronze transition-all z-50 flex items-center justify-center"
+        className="fixed bottom-8 right-8 w-12 h-12 bg-neutral-800 text-white rounded-full shadow-lg hover:bg-neutral-600 transition-all z-50 flex items-center justify-center"
         title="Scroll to top"
       >
         <ArrowUp size={24} />
@@ -817,15 +836,15 @@ export function DocumentViewer({
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-white rounded-lg shadow-2xl max-w-2xl mx-4 p-6">
             <div className="flex items-start justify-between mb-4">
-              <h2 className="text-xl font-bold text-iron-grey flex items-center gap-2">
-                <Info size={24} className="text-bronze" />
+              <h2 className="text-xl font-bold text-neutral-800 flex items-center gap-2">
+                <Info size={24} className="text-primary-600" />
                 Copyright & Licensing
               </h2>
-              <button onClick={() => setShowCopyright(false)} className="text-dim-grey hover:text-iron-grey">
+              <button onClick={() => setShowCopyright(false)} className="text-neutral-600 hover:text-neutral-800">
                 <X size={24} />
               </button>
             </div>
-            <div className="text-sm text-iron-grey space-y-4 leading-relaxed">
+            <div className="text-sm text-neutral-800 space-y-4 leading-relaxed">
               <p>
                 All content is available under the <strong>Open Government Licence v3.0</strong> except where otherwise stated.
               </p>
@@ -833,9 +852,9 @@ export function DocumentViewer({
                 This site additionally contains content derived from <strong>EUR-Lex</strong>, reused under the terms of the Commission Decision 2011/833/EU on the reuse of documents from the EU institutions.
               </p>
               <p>
-                For more information see the <a href="https://eur-lex.europa.eu/content/legal-notice/legal-notice.html" target="_blank" rel="noopener noreferrer" className="text-bronze underline hover:text-iron-grey">EUR-Lex public statement on re-use</a>.
+                For more information see the <a href="https://eur-lex.europa.eu/content/legal-notice/legal-notice.html" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline hover:text-neutral-800">EUR-Lex public statement on re-use</a>.
               </p>
-              <div className="pt-4 border-t border-dim-grey/30 font-semibold">
+              <div className="pt-4 border-t border-neutral-300/30 font-semibold">
                 © Crown and database right
               </div>
             </div>
@@ -843,7 +862,7 @@ export function DocumentViewer({
         </div>
       )}
 
-      <div className="p-4 bg-iron-grey border-b-2 border-dim-grey shadow-sm flex-shrink-0">
+      <div className="p-4 bg-neutral-800 border-b-2 border-neutral-300 shadow-sm flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -858,20 +877,20 @@ export function DocumentViewer({
                     <span>{documentStatus.label}</span>
                   </div>
                   <div className="absolute left-0 top-full mt-2 w-72 bg-white border-2 border-iron-grey rounded-lg shadow-xl p-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                    <p className="text-sm text-iron-grey">{documentStatus.tooltip}</p>
+                    <p className="text-sm text-neutral-800">{documentStatus.tooltip}</p>
                   </div>
                 </div>
               )}
             </div>
             
             <div className="flex items-center gap-4 flex-wrap text-sm">
-              <a href={document.url} target="_blank" rel="noopener noreferrer" className="text-cool-steel hover:text-white flex items-center gap-1">
+              <a href={document.url} target="_blank" rel="noopener noreferrer" className="text-neutral-100 hover:text-white flex items-center gap-1">
                 <ExternalLink size={14} />
                 <span>View on legislation.gov.uk</span>
               </a>
               
               {outstandingChangesUrl && (
-                <a href={outstandingChangesUrl} target="_blank" rel="noopener noreferrer" className="text-bronze hover:text-white flex items-center gap-1 font-medium">
+                <a href={outstandingChangesUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-white flex items-center gap-1 font-medium">
                   <AlertTriangle size={14} />
                   <span>Outstanding Changes</span>
                 </a>
@@ -879,7 +898,7 @@ export function DocumentViewer({
 
               <button
                 onClick={() => setShowCopyright(true)}
-                className="text-cool-steel hover:text-white flex items-center gap-1"
+                className="text-neutral-100 hover:text-white flex items-center gap-1"
               >
                 <Info size={14} />
                 <span>Copyright & Licensing</span>
@@ -888,22 +907,22 @@ export function DocumentViewer({
           </div>
 
           <div className="flex gap-1.5 flex-shrink-0">
-            <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`} title="Toggle favorite">
+            <button onClick={() => onToggleFavorite(document.id)} className={`p-2 rounded-lg transition-all ${document.isFavorite ? 'bg-white text-neutral-800' : 'bg-neutral-700 text-white hover:bg-white hover:text-neutral-800'}`} title="Toggle favorite">
               <Star size={18} fill={document.isFavorite ? 'currentColor' : 'none'} />
             </button>
 
             <div className="relative">
-              <button onClick={() => setShowFolderMenu(!showFolderMenu)} className="p-2 bg-dim-grey text-white hover:bg-white hover:text-iron-grey rounded-lg transition-all" title="Move to folder">
+              <button onClick={() => setShowFolderMenu(!showFolderMenu)} className="p-2 bg-neutral-700 text-white hover:bg-white hover:text-neutral-800 rounded-lg transition-all" title="Move to folder">
                 <FolderInput size={18} />
               </button>
 
               {showFolderMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-white border-2 border-dim-grey rounded-lg shadow-xl z-10 max-h-64 overflow-y-auto">
-                  <button onClick={() => { onMoveToFolder(document.id, null); setShowFolderMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-sand-dune font-medium">
+                <div className="absolute right-0 mt-2 w-56 bg-white border-2 border-neutral-300 rounded-lg shadow-xl z-10 max-h-64 overflow-y-auto">
+                  <button onClick={() => { onMoveToFolder(document.id, null); setShowFolderMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-neutral-800 hover:bg-neutral-50 font-medium">
                     Unfiled
                   </button>
                   {folders.map(folder => (
-                    <button key={folder.id} onClick={() => { onMoveToFolder(document.id, folder.id); setShowFolderMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-iron-grey hover:bg-sand-dune font-medium border-t border-dim-grey/20">
+                    <button key={folder.id} onClick={() => { onMoveToFolder(document.id, folder.id); setShowFolderMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-neutral-800 hover:bg-neutral-50 font-medium border-t border-neutral-300/20">
                       {folder.name}
                     </button>
                   ))}
@@ -914,7 +933,7 @@ export function DocumentViewer({
             <div className="relative">
               <button 
                 onClick={() => setHighlightMode(!highlightMode)} 
-                className={`p-2 rounded-lg transition-all ${highlightMode ? 'bg-white text-iron-grey' : 'bg-dim-grey text-white hover:bg-white hover:text-iron-grey'}`}
+                className={`p-2 rounded-lg transition-all ${highlightMode ? 'bg-white text-neutral-800' : 'bg-neutral-700 text-white hover:bg-white hover:text-neutral-800'}`}
                 title="Highlight mode"
               >
                 <Highlighter size={18} />
@@ -922,22 +941,22 @@ export function DocumentViewer({
 
               {highlightMode && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border-2 border-iron-grey rounded-lg shadow-xl z-10 p-2">
-                  <div className="text-xs font-bold text-iron-grey mb-2 px-2">Highlight Color:</div>
+                  <div className="text-xs font-bold text-neutral-800 mb-2 px-2">Highlight Color:</div>
                   {HIGHLIGHT_COLORS.map((color, idx) => (
                     <button
                       key={idx}
                       onClick={() => setSelectedHighlightColor(idx)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-sand-dune ${selectedHighlightColor === idx ? 'bg-sand-dune' : ''}`}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-neutral-50 ${selectedHighlightColor === idx ? 'bg-neutral-50' : ''}`}
                     >
                       <div className="w-6 h-6 rounded" style={{ backgroundColor: color.color, border: `2px solid ${color.border}` }} />
-                      <span className="text-sm text-iron-grey">{color.name}</span>
+                      <span className="text-sm text-neutral-800">{color.name}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <button onClick={() => onDelete(document.id)} className="p-2 bg-dim-grey text-white hover:bg-red-600 rounded-lg transition-all" title="Delete document">
+            <button onClick={() => onDelete(document.id)} className="p-2 bg-neutral-700 text-white hover:bg-red-600 rounded-lg transition-all" title="Delete document">
               <Trash2 size={18} />
             </button>
           </div>
@@ -947,32 +966,32 @@ export function DocumentViewer({
       <div className="flex-1 flex overflow-hidden">
         {!tocCollapsed && (
           <div 
-            className="border-r-2 border-dim-grey bg-white flex flex-col overflow-hidden relative"
+            className="border-r-2 border-neutral-300 bg-white flex flex-col overflow-hidden relative"
             style={{ width: `${tocWidth}px`, minWidth: '200px', maxWidth: '600px' }}
           >
-            <div className="p-4 border-b border-dim-grey flex items-center justify-between">
-              <h2 className="text-lg font-bold text-iron-grey">Contents</h2>
+            <div className="p-4 border-b border-neutral-300 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-neutral-800">Contents</h2>
               <button
                 onClick={() => setTocCollapsed(true)}
-                className="p-1.5 hover:bg-sand-dune rounded transition-colors"
+                className="p-1.5 hover:bg-neutral-50 rounded transition-colors"
                 title="Hide table of contents"
               >
-                <PanelLeftClose size={18} className="text-dim-grey" />
+                <PanelLeftClose size={18} className="text-neutral-600" />
               </button>
             </div>
 
-            <div className="px-4 py-3 border-b border-dim-grey">
+            <div className="px-4 py-3 border-b border-neutral-300">
               <div className="relative">
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search provisions..." className="w-full px-4 py-2 pl-10 bg-sand-dune text-iron-grey placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30 text-sm" />
-                <Search className="absolute left-3 top-2.5 h-5 w-5 text-dim-grey" />
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search provisions..." className="w-full px-4 py-2 pl-10 bg-neutral-50 text-neutral-800 placeholder-dim-grey/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-neutral-300/30 text-sm" />
+                <Search className="absolute left-3 top-2.5 h-5 w-5 text-neutral-600" />
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-2">
               {loadingTOC ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Loader className="w-8 h-8 text-bronze animate-spin mb-2" />
-                  <p className="text-sm text-dim-grey">Loading contents...</p>
+                  <Loader className="w-8 h-8 text-primary-600 animate-spin mb-2" />
+                  <p className="text-sm text-neutral-600">Loading contents...</p>
                 </div>
               ) : filteredTOC.length > 0 ? (
                 (() => {
@@ -984,48 +1003,48 @@ export function DocumentViewer({
                   });
                 })()
               ) : (
-                <div className="text-center py-8 text-dim-grey text-sm">
+                <div className="text-center py-8 text-neutral-600 text-sm">
                   {searchQuery ? `No match for "${searchQuery}"` : 'No contents available'}
                 </div>
               )}
             </div>
 
             <div
-              className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-bronze transition-colors"
+              className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-neutral-600 transition-colors"
               onMouseDown={() => setIsResizing(true)}
             />
           </div>
         )}
 
         {tocCollapsed && (
-          <div className="border-r-2 border-dim-grey bg-white p-2">
+          <div className="border-r-2 border-neutral-300 bg-white p-2">
             <button
               onClick={() => setTocCollapsed(false)}
-              className="p-2 hover:bg-sand-dune rounded-lg transition-colors"
+              className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"
               title="Show table of contents"
             >
-              <PanelLeftOpen size={20} className="text-iron-grey" />
+              <PanelLeftOpen size={20} className="text-neutral-800" />
             </button>
           </div>
         )}
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedProvision && (
-            <div className="bg-sand-dune border-b-2 border-dim-grey px-6 py-3 flex items-center justify-between flex-shrink-0">
+            <div className="bg-neutral-50 border-b-2 border-neutral-300 px-6 py-3 flex items-center justify-between flex-shrink-0">
               <button
                 onClick={() => navigateProvision('prev')}
                 disabled={currentProvisionIndex === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
               >
                 <PrevIcon size={16} />
                 Previous
               </button>
               
               <div className="text-center">
-                <div className="text-xs text-dim-grey font-medium">
+                <div className="text-xs text-neutral-600 font-medium">
                   {currentProvisionIndex + 1} of {flatProvisions.length}
                 </div>
-                <div className="text-sm font-bold text-iron-grey">
+                <div className="text-sm font-bold text-neutral-800">
                   {selectedProvision.number} {selectedProvision.title}
                 </div>
               </div>
@@ -1033,7 +1052,7 @@ export function DocumentViewer({
               <button
                 onClick={() => navigateProvision('next')}
                 disabled={currentProvisionIndex === flatProvisions.length - 1}
-                className="flex items-center gap-2 px-4 py-2 bg-iron-grey text-white rounded-lg hover:bg-bronze transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-neutral-800 text-white rounded-lg hover:bg-neutral-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed font-semibold text-sm"
               >
                 Next
                 <NextIcon size={16} />
@@ -1143,19 +1162,19 @@ export function DocumentViewer({
           >
             {loadingProvision ? (
               <div className="flex flex-col items-center justify-center h-full">
-                <Loader className="w-12 h-12 text-bronze animate-spin mb-4" />
-                <p className="text-lg text-iron-grey">Loading provision...</p>
+                <Loader className="w-12 h-12 text-primary-600 animate-spin mb-4" />
+                <p className="text-lg text-neutral-800">Loading provision...</p>
               </div>
             ) : selectedProvision ? (
               <div className="p-8 max-w-4xl mx-auto">
                 <div className="mb-6">
                   <div className="flex items-baseline gap-3 mb-2">
                     {selectedProvision.number && (
-                      <span className="text-2xl font-bold text-bronze">
+                      <span className="text-2xl font-bold text-primary-600">
                         {selectedProvision.number}
                       </span>
                     )}
-                    <h2 className="text-2xl font-bold text-iron-grey">
+                    <h2 className="text-2xl font-bold text-neutral-800">
                       {selectedProvision.title}
                     </h2>
                   </div>
@@ -1176,10 +1195,10 @@ export function DocumentViewer({
             ) : (
               <div className="flex items-center justify-center h-full text-center px-8">
                 <div>
-                  <p className="text-xl font-semibold text-iron-grey mb-2">
+                  <p className="text-xl font-semibold text-neutral-800 mb-2">
                     Select a provision
                   </p>
-                  <p className="text-sm text-dim-grey">
+                  <p className="text-sm text-neutral-600">
                     Click any item in the table of contents
                   </p>
                 </div>
@@ -1189,8 +1208,8 @@ export function DocumentViewer({
         </div>
 
         {rightPanelTab === 'relationships' && (
-          <div className="w-[600px] border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
-            <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
+          <div className="w-[600px] border-l-2 border-neutral-300 bg-white flex flex-col shadow-lg overflow-hidden">
+            <div className="bg-neutral-800 border-b-2 border-neutral-300 flex-shrink-0">
               <div className="flex items-center justify-between p-4">
                 <h3 className="text-white font-semibold flex items-center gap-2">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1208,23 +1227,23 @@ export function DocumentViewer({
                 </h3>
                 <button
                   onClick={() => setRightPanelTab(null)}
-                  className="text-white hover:text-bronze transition-colors"
+                  className="text-white hover:text-primary-600 transition-colors"
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 bg-sand-dune">
+            <div className="flex-1 overflow-y-auto p-4 bg-neutral-50">
               {loadingRelationships ? (
                 <div className="flex flex-col items-center justify-center h-full">
-                  <Loader className="w-12 h-12 text-bronze animate-spin mb-4" />
-                  <p className="text-sm text-iron-grey">Loading relationships...</p>
+                  <Loader className="w-12 h-12 text-primary-600 animate-spin mb-4" />
+                  <p className="text-sm text-neutral-800">Loading relationships...</p>
                 </div>
               ) : relationshipsData && relationshipsData.nodes.length > 1 ? (
                 <div className="space-y-4">
                   <div className="bg-white rounded-lg p-4 border border-bronze/30">
-                    <h4 className="font-bold text-iron-grey mb-3 flex items-center gap-2">
+                    <h4 className="font-bold text-neutral-800 mb-3 flex items-center gap-2">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="16 18 22 12 16 6"/>
                         <polyline points="8 6 2 12 8 18"/>
@@ -1236,7 +1255,7 @@ export function DocumentViewer({
                       .map((link: any, idx: number) => {
                         const targetNode = relationshipsData.nodes.find((n: any) => n.id === link.target);
                         return (
-                          <div key={idx} className="mb-3 p-3 bg-sand-dune rounded border border-dim-grey/20">
+                          <div key={idx} className="mb-3 p-3 bg-neutral-50 rounded border border-neutral-300/20">
                             <div className="flex items-start gap-2">
                               <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded font-semibold uppercase">
                                 {link.type}
@@ -1245,7 +1264,7 @@ export function DocumentViewer({
                                 href={targetNode?.url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-sm font-medium text-iron-grey hover:text-bronze flex items-center gap-1"
+                                className="text-sm font-medium text-neutral-800 hover:text-primary-600 flex items-center gap-1"
                               >
                                 {targetNode?.name}
                                 <ExternalLink size={12} />
@@ -1255,12 +1274,12 @@ export function DocumentViewer({
                         );
                       })}
                     {relationshipsData.links.filter((link: any) => link.source === relationshipsData.nodes[0].id).length === 0 && (
-                      <p className="text-sm text-dim-grey italic">No outgoing relationships found</p>
+                      <p className="text-sm text-neutral-600 italic">No outgoing relationships found</p>
                     )}
                   </div>
 
                   <div className="bg-white rounded-lg p-4 border border-bronze/30">
-                    <h4 className="font-bold text-iron-grey mb-3 flex items-center gap-2">
+                    <h4 className="font-bold text-neutral-800 mb-3 flex items-center gap-2">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="9 18 15 12 9 6"/>
                         <polyline points="15 18 21 12 15 6"/>
@@ -1272,7 +1291,7 @@ export function DocumentViewer({
                       .map((link: any, idx: number) => {
                         const sourceNode = relationshipsData.nodes.find((n: any) => n.id === link.source);
                         return (
-                          <div key={idx} className="mb-3 p-3 bg-sand-dune rounded border border-dim-grey/20">
+                          <div key={idx} className="mb-3 p-3 bg-neutral-50 rounded border border-neutral-300/20">
                             <div className="flex items-start gap-2">
                               <span className="text-xs px-2 py-1 bg-amber-100 text-amber-800 rounded font-semibold uppercase">
                                 {link.type}
@@ -1281,7 +1300,7 @@ export function DocumentViewer({
                                 href={sourceNode?.url} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-sm font-medium text-iron-grey hover:text-bronze flex items-center gap-1"
+                                className="text-sm font-medium text-neutral-800 hover:text-primary-600 flex items-center gap-1"
                               >
                                 {sourceNode?.name}
                                 <ExternalLink size={12} />
@@ -1291,12 +1310,12 @@ export function DocumentViewer({
                         );
                       })}
                     {relationshipsData.links.filter((link: any) => link.target === relationshipsData.nodes[0].id).length === 0 && (
-                      <p className="text-sm text-dim-grey italic">No incoming relationships found</p>
+                      <p className="text-sm text-neutral-600 italic">No incoming relationships found</p>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-dim-grey py-12">
+                <div className="text-center text-neutral-600 py-12">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mx-auto mb-4 opacity-30">
                     <circle cx="12" cy="12" r="10"/>
                     <line x1="12" y1="8" x2="12" y2="12"/>
@@ -1310,16 +1329,16 @@ export function DocumentViewer({
         )}
 
         {rightPanelTab === 'notes' && (
-          <div className="w-80 border-l-2 border-dim-grey bg-white flex flex-col shadow-lg overflow-hidden">
-            <div className="bg-iron-grey border-b-2 border-dim-grey flex-shrink-0">
-              <div className="flex items-center justify-between p-4 border-b border-dim-grey/30">
+          <div className="w-80 border-l-2 border-neutral-300 bg-white flex flex-col shadow-lg overflow-hidden">
+            <div className="bg-neutral-800 border-b-2 border-neutral-300 flex-shrink-0">
+              <div className="flex items-center justify-between p-4 border-b border-neutral-300/30">
                 <h3 className="text-white font-semibold flex items-center gap-2">
                   <StickyNote size={16} />
                   User Notes ({document.comments.length})
                 </h3>
                 <button
                   onClick={() => setRightPanelTab(null)}
-                  className="text-white hover:text-bronze transition-colors"
+                  className="text-white hover:text-primary-600 transition-colors"
                 >
                   <X size={16} />
                 </button>
@@ -1332,40 +1351,40 @@ export function DocumentViewer({
                     value={notesSearchQuery} 
                     onChange={(e) => setNotesSearchQuery(e.target.value)} 
                     placeholder="Search notes..." 
-                    className="w-full px-3 py-2 pl-9 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30"
+                    className="w-full px-3 py-2 pl-9 bg-white text-neutral-800 placeholder-dim-grey/60 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-bronze border border-neutral-300/30"
                   />
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-dim-grey" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-neutral-600" />
                 </div>
                 
                 <textarea 
                   value={newComment} 
                   onChange={(e) => setNewComment(e.target.value)} 
                   placeholder="Add a note..." 
-                  className="w-full px-3 py-2.5 bg-white text-iron-grey placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-dim-grey/30" 
+                  className="w-full px-3 py-2.5 bg-white text-neutral-800 placeholder-dim-grey/60 text-sm rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-bronze border border-neutral-300/30" 
                   rows={3} 
                 />
                 <button 
                   onClick={handleAddComment} 
                   disabled={!newComment.trim()} 
-                  className="w-full bg-white text-iron-grey font-semibold py-2.5 rounded-lg hover:bg-bronze hover:text-white transition-all shadow-sm disabled:opacity-50"
+                  className="w-full bg-white text-neutral-800 font-semibold py-2.5 rounded-lg hover:bg-neutral-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
                 >
                   Add Note
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-sand-dune">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-neutral-50">
               {filteredNotes.length === 0 ? (
-                <div className="text-center text-dim-grey/60 py-8 italic text-sm">
+                <div className="text-center text-neutral-600/60 py-8 italic text-sm">
                   {notesSearchQuery ? `No notes match "${notesSearchQuery}"` : 'No notes yet'}
                 </div>
               ) : (
                 filteredNotes.map(comment => (
-                  <div key={comment.id} className="p-3 bg-white rounded-lg border border-dim-grey/20 shadow-sm">
-                    <div className="text-xs text-dim-grey/70 mb-1.5 font-medium">
+                  <div key={comment.id} className="p-3 bg-white rounded-lg border border-neutral-300/20 shadow-sm">
+                    <div className="text-xs text-neutral-600/70 mb-1.5 font-medium">
                       {comment.timestamp.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <div className="text-sm text-iron-grey leading-relaxed">{comment.text}</div>
+                    <div className="text-sm text-neutral-800 leading-relaxed">{comment.text}</div>
                   </div>
                 ))
               )}
@@ -1374,13 +1393,13 @@ export function DocumentViewer({
         )}
 
         {rightPanelTab === null && (
-          <div className="border-l-2 border-dim-grey bg-white p-2 flex flex-col gap-2">
+          <div className="border-l-2 border-neutral-300 bg-white p-2 flex flex-col gap-2">
             <button
               onClick={() => setRightPanelTab('relationships')}
-              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
+              className="p-2 hover:bg-neutral-50 rounded-lg transition-colors relative"
               title="Legislation Relationships"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-iron-grey">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-neutral-800">
                 <circle cx="12" cy="12" r="3"/>
                 <circle cx="12" cy="5" r="2"/>
                 <circle cx="5" cy="12" r="2"/>
@@ -1395,12 +1414,12 @@ export function DocumentViewer({
             
             <button
               onClick={() => setRightPanelTab('notes')}
-              className="p-2 hover:bg-sand-dune rounded-lg transition-colors relative"
+              className="p-2 hover:bg-neutral-50 rounded-lg transition-colors relative"
               title="User Notes"
             >
-              <StickyNote size={20} className="text-iron-grey" />
+              <StickyNote size={20} className="text-neutral-800" />
               {document.comments.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-bronze text-white text-xs font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {document.comments.length}
                 </span>
               )}
