@@ -70,9 +70,6 @@ export function DocumentViewer({
   const [highlightMode, setHighlightMode] = useState(false);
   const [selectedHighlightColor, setSelectedHighlightColor] = useState(0);
   const [documentStatus, setDocumentStatus] = useState<StatusInfo | null>(null);
-  const [outstandingChangesUrl, setOutstandingChangesUrl] = useState<string>('');
-  const [relationshipsData, setRelationshipsData] = useState<any>(null);
-  const [loadingRelationships, setLoadingRelationships] = useState(false);
   const [displayTheme, setDisplayTheme] = useState<'light' | 'dark' | 'sepia'>('light');
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
   const contentRef = useRef<HTMLDivElement>(null);
@@ -135,8 +132,6 @@ export function DocumentViewer({
         const metadata = xmlDoc.querySelector('Metadata');
         const status = extractStatusFromMetadata(metadata);
         setDocumentStatus(status);
-        
-        setOutstandingChangesUrl(`${baseUrl}/changes/affected`);
         
         const toc = parseTOCFromXML(xmlDoc);
         setTableOfContents(toc);
@@ -891,13 +886,6 @@ export function DocumentViewer({
                 <ExternalLink size={14} />
                 <span>View on legislation.gov.uk</span>
               </a>
-              
-              {outstandingChangesUrl && (
-                <a href={outstandingChangesUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-white flex items-center gap-1 font-medium">
-                  <AlertTriangle size={14} />
-                  <span>Outstanding Changes</span>
-                </a>
-              )}
 
               <button
                 onClick={() => setShowCopyright(true)}
@@ -1071,36 +1059,36 @@ export function DocumentViewer({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setDisplayTheme('light')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                    className={`p-2 rounded transition-all flex items-center justify-center ${
                       displayTheme === 'light'
-                        ? 'bg-neutral-800 text-white'
-                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                        ? 'bg-neutral-800'
+                        : 'bg-white hover:bg-neutral-50 border border-neutral-300'
                     }`}
                     title="Light theme"
                   >
-                    Light
+                    <div className="w-5 h-5 rounded-full bg-white border-2 border-neutral-400"></div>
                   </button>
                   <button
                     onClick={() => setDisplayTheme('dark')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                    className={`p-2 rounded transition-all flex items-center justify-center ${
                       displayTheme === 'dark'
-                        ? 'bg-neutral-800 text-white'
-                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                        ? 'bg-neutral-800'
+                        : 'bg-white hover:bg-neutral-50 border border-neutral-300'
                     }`}
                     title="Dark theme"
                   >
-                    Dark
+                    <div className="w-5 h-5 rounded-full bg-neutral-900"></div>
                   </button>
                   <button
                     onClick={() => setDisplayTheme('sepia')}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                    className={`p-2 rounded transition-all flex items-center justify-center ${
                       displayTheme === 'sepia'
-                        ? 'bg-neutral-800 text-white'
-                        : 'bg-white text-neutral-600 hover:bg-neutral-50 border border-neutral-300'
+                        ? 'bg-neutral-800'
+                        : 'bg-white hover:bg-neutral-50 border border-neutral-300'
                     }`}
                     title="Sepia theme"
                   >
-                    Sepia
+                    <div className="w-5 h-5 rounded-full" style={{backgroundColor: '#f5f1e8'}}></div>
                   </button>
                 </div>
               </div>
